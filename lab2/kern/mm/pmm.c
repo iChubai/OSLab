@@ -1,11 +1,13 @@
 #include <default_pmm.h>
 #include <best_fit_pmm.h>
+#include <buddy_pmm.h>
 #include <defs.h>
 #include <error.h>
 #include <memlayout.h>
 #include <mmu.h>
 #include <pmm.h>
 #include <sbi.h>
+#include <slub.h>
 #include <stdio.h>
 #include <string.h>
 #include <riscv.h>
@@ -34,7 +36,7 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    pmm_manager = &best_fit_pmm_manager;
+    pmm_manager = &buddy_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -115,6 +117,10 @@ void pmm_init(void) {
 
     // use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
+
+    // initialize slub on top of pmm and run a basic self-check
+    slub_init();
+    slub_check();
 
     extern char boot_page_table_sv39[];
     satp_virtual = (pte_t*)boot_page_table_sv39;

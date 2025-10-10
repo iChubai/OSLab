@@ -1,0 +1,46 @@
+{
+    "configurations": [
+        {
+            "name": "UCore RISC-V",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/defaultShare/archive/yinbowen/Houjd/study/labcode/lab2/kern/**",
+                "/defaultShare/archive/yinbowen/Houjd/study/labcode/lab2/libs/**",
+                "/defaultShare/archive/yinbowen/Houjd/study/labcode/lab2/tools/**"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "__UCORE__",
+                "RISC_V",
+                "PGSHIFT=12",
+                "PTSIZE=512",
+                "NCPU=1",
+                "DRAM_BASE=0x80000000",
+                "KERNBASE=0xFFFFFFFFC0200000",
+                "KMEMSIZE=0x7E00000",
+                "KERNTOP=(KERNBASE + KMEMSIZE)",
+                "PHYSICAL_MEMORY_OFFSET=0xFFFFFFFF40000000",
+                "KERNEL_BEGIN_PADDR=0x80200000",
+                "KSTACKPAGE=2",
+                "KSTACKSIZE=(KSTACKPAGE * PGSIZE)",
+                "__riscv_xlen=64",
+                "REGBYTES=8",
+                "LOG_REGBYTES=3"
+            ],
+            "compilerPath": "/defaultShare/archive/yinbowen/Houjd/study/riscv64-unknown-elf-toolchain-10.2.0-2020.12.8-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gcc",
+            "cStandard": "c99",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/**"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "forcedInclude": [
+                "${workspaceFolder}/libs/defs.h"
+            ]
+        }
+    ],
+    "version": 4
+}
