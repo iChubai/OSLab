@@ -50,7 +50,7 @@ bootstack:
     .global bootstacktop
 bootstacktop:
 
-.section .data
+.section .bootpt,"aw",%progbits
     # 由于我们要把这个页表放到一个页里面，因此必须 12 位对齐
     .align PGSHIFT
     .global boot_page_table_sv39
@@ -62,6 +62,7 @@ boot_page_table_sv39:
     # 设置最后一个页表项，PPN=0x80000，标志位 VRWXAD 均为 1
     .quad (0x80000 << 10) | 0xcf # VRWXAD
 
+.section .data
     .global boot_hartid
 boot_hartid:
     .quad 0

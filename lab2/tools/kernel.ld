@@ -18,6 +18,10 @@ SECTIONS
 
     PROVIDE(etext = .); /* Define the 'etext' symbol to this value */
 
+    /* Place boot page table at fixed offset 0x4000 from BASE_ADDRESS */
+    . = BASE_ADDRESS + 0x4000;
+    .bootpt : { *(.bootpt) }
+
     .rodata : {
         *(.rodata .rodata.* .gnu.linkonce.r.*)
     }
