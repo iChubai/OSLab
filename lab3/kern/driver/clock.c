@@ -1,48 +1,118 @@
-#include <clock.h>
-#include <defs.h>
-#include <sbi.h>
-#include <stdio.h>
-#include <riscv.h>
+/* ======================================================================================
+ * clock.c - 时钟中断驱动程序
+ *
+ * 这个文件实现了RISC-V架构下的系统时钟功能，主要包括：
+ * 1. 时钟中断的初始化和配置
+ * 2. 时钟计数器的维护
+ * 3. 下次时钟中断的设置
+ *
+ * 时钟中断在操作系统中扮演重要角色：
+ * - 提供时间基准（system tick）
+ * - 实现进程调度的时间片轮转
+ * - 处理超时和定时任务
+ * - 维护系统时间
+ * ====================================================================================== */
 
+#include <clock.h>          // 时钟相关定义
+#include <defs.h>           // 基本类型定义
+#include <sbi.h>            // SBI接口
+#include <stdio.h>          // 标准I/O
+#include <riscv.h>          // RISC-V特有定义和CSR操作
+
+/* ticks - 全局时钟计数器
+ * 记录自系统启动以来发生的时钟中断总数
+ * 这个变量在trap.c中的时钟中断处理函数中被递增
+ * volatile关键字确保每次访问都从内存读取，因为它在中断处理函数中被修改
+ */
 volatile size_t ticks;
 
+/* ======================================================================================
+ * get_cycles - 读取当前时钟周期计数
+ *
+ * RISC-V提供了rdtime指令来读取当前的时钟周期数
+ * 这个函数根据RISC-V的位宽（32位或64位）使用不同的实现
+ *
+ * 在32位RISC-V中，由于rdtime返回64位值，需要分两次读取：
+ * 先读高32位，再读低32位，然后检查高32位是否在读取过程中发生变化
+ * ====================================================================================== */
 static inline uint64_t get_cycles(void) {
 #if __riscv_xlen == 64
+    /* 64位RISC-V的实现
+     * 直接使用rdtime指令读取64位周期计数
+     */
     uint64_t n;
     __asm__ __volatile__("rdtime %0" : "=r"(n));
     return n;
 #else
+    /* 32位RISC-V的实现
+     * 需要原子地读取64位值，分两次读取并检查一致性
+     */
     uint32_t lo, hi, tmp;
     __asm__ __volatile__(
-        "1:\n"
-        "rdtimeh %0\n"
-        "rdtime %1\n"
-        "rdtimeh %2\n"
-        "bne %0, %2, 1b"
-        : "=&r"(hi), "=&r"(lo), "=&r"(tmp));
-    return ((uint64_t)hi << 32) | lo;
+        "1:\n"                    // 标签1：开始原子读取序列
+        "rdtimeh %0\n"           // 读取高32位到hi
+        "rdtime %1\n"            // 读取低32位到lo
+        "rdtimeh %2\n"           // 再次读取高32位到tmp
+        "bne %0, %2, 1b"        // 如果两次读的高32位不同，重新读取
+        : "=&r"(hi), "=&r"(lo), "=&r"(tmp));  // 输出约束，&表示earlyclobber
+    return ((uint64_t)hi << 32) | lo;  // 组合成64位值
 #endif
 }
 
-// Hardcode timebase
+/* timebase - 时钟中断的时间间隔
+ * 单位是时钟周期数，表示两次时钟中断之间的周期数
+ *
+ * 这个值决定了时钟中断的频率：
+ * - 更小的值 = 更频繁的中断 = 更高的时钟分辨率但更多开销
+ * - 更大的值 = 更少的中断 = 更低的开销但 coarser 时间分辨率
+ *
+ * 这里硬编码为100000，在QEMU中大约对应10ms的间隔
+ * （QEMU默认时钟频率为10MHz，所以100000周期 = 10ms）
+ */
 static uint64_t timebase = 100000;
 
-/* *
- * clock_init - initialize 8253 clock to interrupt 100 times per second,
- * and then enable IRQ_TIMER.
- * */
+/* ======================================================================================
+ * clock_init - 初始化系统时钟
+ *
+ * 这个函数设置系统时钟中断，使其能够定期触发中断
+ * 执行步骤：
+ * 1. 启用时钟中断
+ * 2. 设置第一次时钟中断
+ * 3. 初始化时钟计数器
+ *
+ * 注意：RISC-V中没有传统的8253定时器芯片，这里通过SBI调用来设置
+ * ====================================================================================== */
 void clock_init(void) {
-    // enable timer interrupt in sie
+    /* 启用监管者态时钟中断
+     * sie (Supervisor Interrupt Enable) 寄存器控制哪些中断被允许
+     * MIP_STIP是时钟中断pending位，通过设置sie允许时钟中断
+     */
     set_csr(sie, MIP_STIP);
-    // divided by 500 when using Spike(2MHz)
-    // divided by 100 when using QEMU(10MHz)
-    // timebase = sbi_timebase() / 500;
+
+    /* 设置第一次时钟中断
+     * 这会启动时钟中断的周期性触发
+     */
     clock_set_next_event();
 
-    // initialize time counter 'ticks' to zero
+    /* 初始化全局时钟计数器为0 */
     ticks = 0;
 
+    /* 输出初始化完成信息 */
     cprintf("++ setup timer interrupts\n");
 }
 
-void clock_set_next_event(void) { sbi_set_timer(get_cycles() + timebase); }
+/* ======================================================================================
+ * clock_set_next_event - 设置下次时钟中断的时间点
+ *
+ * 这个函数计算并设置下次时钟中断应该发生的时间点
+ * 通过SBI调用告诉硬件什么时候触发下次时钟中断
+ *
+ * 参数：无
+ * 返回：无
+ * ====================================================================================== */
+void clock_set_next_event(void) {
+    /* 计算下次中断的时间点
+     * 当前时间 + 时间间隔 = 下次中断时间
+     */
+    sbi_set_timer(get_cycles() + timebase);
+}
