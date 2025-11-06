@@ -64,6 +64,26 @@ static void print_ticks() {
  * 5. 处理完成后恢复上下文并返回（trapentry.S中的__trapret）
  * ====================================================================================== */
 void idt_init(void) {
+    /* LAB3 2311671 : STEP 2 */
+    /* (1) Where are the entry addrs of each Interrupt Service Routine (ISR)?
+     *     All ISR's entry addrs are stored in __vectors. where is uintptr_t
+     * __vectors[] ?
+     *     __vectors[] is in kern/trap/vector.S which is produced by
+     * tools/vector.c
+     *     (try "make" command in lab3, then you will find vector.S in kern/trap
+     * DIR)
+     *     You can use  "extern uintptr_t __vectors[];" to define this extern
+     * variable which will be used later.
+     * (2) Now you should setup the entries of ISR in Interrupt Description
+     * Table (IDT).
+     *     Can you see idt[256] in this file? Yes, it's IDT! you can use SETGATE
+     * macro to setup each item of IDT
+     * (3) After setup the contents of IDT, you will let CPU know where is the
+     * IDT by using 'lidt' instruction.
+     *     You don't know the meaning of this instruction? just google it! and
+     * check the libs/x86.h to know more.
+     *     Notice: the argument of lidt is idt_pd. try to find it!
+     */
     /* LAB3 任务要求：设置中断处理向量 */
 
     /* 声明外部符号__alltraps
@@ -264,6 +284,12 @@ void interrupt_handler(struct trapframe *tf) {
             break;
 
         case IRQ_S_TIMER:
+        // "All bits besides SSIP and USIP in the sip register are
+        // read-only." -- privileged spec1.9.1, 4.1.4, p59
+        // In fact, Call sbi_set_timer will clear STIP, or you can clear it
+        // directly.
+        // cprintf("Supervisor timer interrupt\n");
+         /* LAB3 EXERCISE1   2311671 :  */
             /* 监管者态时钟中断 - 最重要的中断之一
              * 由系统定时器触发，用于：
              * 1. 进程调度（时间片轮转）
@@ -371,6 +397,7 @@ void exception_handler(struct trapframe *tf) {
             break;
 
         case CAUSE_ILLEGAL_INSTRUCTION:
+           /* LAB3 CHALLENGE3   2311671 :  */
             /* 非法指令异常 - LAB3 CHALLENGE3
              * CPU遇到无法识别或无效的指令时触发
              * 常见原因：
@@ -395,7 +422,7 @@ void exception_handler(struct trapframe *tf) {
             break;
 
         case CAUSE_BREAKPOINT:
-            /* 断点异常 - LAB3 CHALLENGE3
+            /* 断点异常 - LAB3 CHALLENGE3   2311671 : 
              * 执行ebreak指令时触发
              * 通常用于调试目的，允许程序在特定位置停止执行
              * 调试器可以在这里设置断点
