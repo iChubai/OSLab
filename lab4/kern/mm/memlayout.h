@@ -1,34 +1,98 @@
 #ifndef __KERN_MM_MEMLAYOUT_H__
 #define __KERN_MM_MEMLAYOUT_H__
 
-/* This file contains the definitions for memory management in our OS. */
+/**
+ * @file kern/mm/memlayout.h
+ * @brief 内核内存布局定义
+ *
+ * 本头文件定义了ucore操作系统的内存布局结构，包括虚拟地址空间的划分、
+ * 物理页描述符、内存管理数据结构等。这是整个内存管理子系统的核心定义文件。
+ *
+ * ============================================================================
+ * 虚拟地址空间布局 (RISC-V SV39)
+ * ============================================================================
+ *
+ * RISC-V使用64位虚拟地址空间，但实际只使用低39位（512GB）。
+ * 内核占据虚拟地址空间的高地址部分，用户进程使用低地址部分。
+ *
+ *     0xFFFFFFFFFFFFFFFF (2^64-1)  ← 虚拟地址空间顶部
+ *                            |
+ *                            |   未使用区域 (高39位以上)
+ *                            |
+ *     0x0000008000000000 ─── + ──────────────────────────────
+ *                            |   内核空间 (512GB)
+ *                            |   0xFFFFFFC000000000 ~ 0xFFFFFFFFFFFFFFFF
+ *                            |
+ *     KERNTOP ─────────────> + ────────────────────────────── 0xFFFFFFC07E00000
+ *     (0xFFFFFFC07E00000)    |   内核重映射物理内存 (126MB)
+ *                            |   直接映射物理内存0x0 ~ 0x7E00000
+ *                            |
+ *     KERNBASE ────────────> + ────────────────────────────── 0xFFFFFFC02000000
+ *     (0xFFFFFFC02000000)    |   内核代码和数据
+ *                            |   内核镜像、栈、堆等
+ *                            |
+ *     0xFFFFFFC000000000 ─── + ──────────────────────────────
+ *                            |   未映射区域 (保护页)
+ *                            |   防止用户空间访问内核
+ *                            |
+ *     0x0000004000000000 ─── + ──────────────────────────────
+ *                            |   用户空间 (256GB)
+ *                            |   0x0 ~ 0x0000003FFFFFFFFF
+ *                            |
+ *     0x0000000000000000 ─── + ────────────────────────────── 虚拟地址空间底部
+ *
+ * ============================================================================
+ * 关键地址常量详解
+ * ============================================================================
+ */
 
-/* *
- * Virtual memory map:                                          Permissions
- *                                                              kernel/user
+/**
+ * 内核虚拟地址空间的起始地址
  *
- *     4G ------------------> +---------------------------------+
- *                            |                                 |
- *                            |         Empty Memory (*)        |
- *                            |                                 |
- *                            +---------------------------------+ 0xFB000000
- *                            |   Cur. Page Table (Kern, RW)    | RW/-- PTSIZE
- *     VPT -----------------> +---------------------------------+ 0xFAC00000
- *                            |        Invalid Memory (*)       | --/--
- *     KERNTOP -------------> +---------------------------------+ 0xF8000000
- *                            |                                 |
- *                            |    Remapped Physical Memory     | RW/-- KMEMSIZE
- *                            |                                 |
- *     KERNBASE ------------> +---------------------------------+ 0xC0000000
- *                            |                                 |
- *                            |                                 |
- *                            |                                 |
- *                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * (*) Note: The kernel ensures that "Invalid Memory" is *never* mapped.
- *     "Empty Memory" is normally unmapped, but user programs may map pages
- *     there if desired.
+ * 所有内核代码、数据、堆、栈都位于这个地址之上。
+ * 这个地址的选择考虑了：
+ * 1. 留出足够大的用户地址空间
+ * 2. 方便进行地址转换计算
+ * 3. 与物理地址有固定的偏移关系
+ */
+#define KERNBASE            0xFFFFFFC0200000
+
+/**
+ * 内核可以映射的最大物理内存量 (126MB)
  *
- * */
+ * 这个限制由两个因素决定：
+ * 1. 内核虚拟地址空间的大小
+ * 2. 安全的内存访问范围
+ *
+ * 计算：KERNTOP - KERNBASE = 0x7E00000 = 126MB
+ */
+#define KMEMSIZE            0x7E00000
+
+/**
+ * 内核虚拟地址空间的结束地址
+ *
+ * KERNTOP = KERNBASE + KMEMSIZE
+ * 超过这个地址的访问会导致页面错误
+ */
+#define KERNTOP             (KERNBASE + KMEMSIZE)
+
+/**
+ * 物理地址到内核虚拟地址的偏移量
+ *
+ * 物理地址PA对应内核虚拟地址：PA + PHYSICAL_MEMORY_OFFSET
+ * 这个偏移量的设计使得：
+ * 1. 物理地址0x0映射到内核虚拟地址0xFFFFFFC04000000
+ * 2. 便于在内核中访问物理内存
+ *
+ * 计算：0xFFFFFFC04000000 - 0x0 = 0xFFFFFFC04000000
+ */
+#define PHYSICAL_MEMORY_OFFSET      0xFFFFFFC04000000
+
+/**
+ * 内核栈的大小设置
+ */
+#define KSTACKPAGE          2                           /**< 内核栈占用的页数 */
+#define KSTACKSIZE          (KSTACKPAGE * PGSIZE)       /**< 内核栈总大小 (8KB) */
 
 /* All physical memory mapped at this address */
 #define KERNBASE            0xFFFFFFFFC0200000
@@ -47,44 +111,222 @@
 #include <atomic.h>
 #include <list.h>
 
-typedef uintptr_t pte_t;
-typedef uintptr_t pde_t;
-typedef pte_t swap_entry_t; //the pte can also be a swap entry
+/**
+ * ============================================================================
+ * 内存管理数据类型定义
+ * ============================================================================
+ */
 
-/* *
- * struct Page - Page descriptor structures. Each Page describes one
- * physical page. In kern/mm/pmm.h, you can find lots of useful functions
- * that convert Page to other data types, such as physical address.
- * */
+/** 页表项类型 */
+typedef uintptr_t pte_t;
+
+/** 页目录项类型 */
+typedef uintptr_t pde_t;
+
+/** 交换条目类型（页表项的别名，用于页面置换） */
+typedef pte_t swap_entry_t;
+
+/**
+ * @brief 物理页描述符结构体
+ *
+ * 这是操作系统内存管理系统的核心数据结构。每个物理页都对应一个Page结构体，
+ * 用于跟踪该页面的状态、引用情况和在各种链表中的位置。
+ *
+ * Page结构体与实际物理页面的关系：
+ * - 每个物理页面都有一个对应的Page结构体
+ * - Page结构体存储在内核数据区，不是在物理页面内部
+ * - 通过计算可以从Page结构体找到对应的物理地址
+ *
+ * ============================================================================
+ * 字段详细说明
+ * ============================================================================
+ */
 struct Page {
-    int ref;                        // page frame's reference counter
-    uint_t flags;                 // array of flags that describe the status of the page frame
-    unsigned int property;          // the num of free block, used in first fit pm manager
-    list_entry_t page_link;         // free list link
-    list_entry_t pra_page_link;     // used for pra (page replace algorithm)
-    uintptr_t pra_vaddr;            // used for pra (page replace algorithm)
+    /**
+     * 引用计数器 (Reference Counter)
+     *
+     * 记录当前有多少个虚拟地址映射到这个物理页面：
+     * - 0: 页面空闲，可以被分配
+     * - 1: 页面被一个映射使用
+     * - >1: 页面被多个映射共享（共享内存、COW等）
+     *
+     * 引用计数用于：
+     * - 防止过早释放仍在使用的页面
+     * - 支持页面共享机制
+     * - 内存管理的安全性保证
+     */
+    int ref;
+
+    /**
+     * 页面状态标志位 (Flags)
+     *
+     * 使用位图存储页面的各种状态信息：
+     * - PG_reserved: 内核保留页面，不能用于分配
+     * - PG_property: 空闲块头部标识（用于伙伴算法等）
+     *
+     * 通过位操作函数管理：
+     * - SetPageReserved/ClearPageReserved
+     * - SetPageProperty/ClearPageProperty
+     * - PageReserved/PageProperty
+     */
+    uint_t flags;
+
+    /**
+     * 空闲块大小 (Property)
+     *
+     * 用于伙伴系统等内存分配算法，记录连续空闲页面的数量。
+     * 只在空闲块的头部页面中有效，其他页面设为0。
+     */
+    unsigned int property;
+
+    /**
+     * 空闲链表链接 (Free List Link)
+     *
+     * 用于将空闲页面组织成链表，便于快速分配和释放。
+     * 页面在空闲时通过这个字段链接到空闲页面链表中。
+     */
+    list_entry_t page_link;
+
+    /**
+     * 页面置换算法链接 (PRA Link)
+     *
+     * 用于页面置换算法（如LRU、Clock等），将页面按访问顺序组织。
+     * 在后续实验中用于实现虚拟内存的页面置换功能。
+     */
+    list_entry_t pra_page_link;
+
+    /**
+     * 页面置换算法虚拟地址 (PRA Virtual Address)
+     *
+     * 存储这个物理页面映射到的虚拟地址，用于页面置换决策。
+     * 页面置换时需要知道页面对应的虚拟地址来进行TLB刷新等操作。
+     */
+    uintptr_t pra_vaddr;
 };
 
-/* Flags describing the status of a page frame */
-#define PG_reserved                 0       // if this bit=1: the Page is reserved for kernel, cannot be used in alloc/free_pages; otherwise, this bit=0 
-#define PG_property                 1       // if this bit=1: the Page is the head page of a free memory block(contains some continuous_addrress pages), and can be used in alloc_pages; if this bit=0: if the Page is the the head page of a free memory block, then this Page and the memory block is alloced. Or this Page isn't the head page.
+/**
+ * ============================================================================
+ * 页面状态标志位定义
+ * ============================================================================
+ *
+ * Page结构体的flags字段使用位图存储页面的各种状态信息。
+ * 每个标志位代表页面的一种特定状态，便于快速查询和修改。
+ */
 
+/**
+ * 内核保留标志位 (Position 0)
+ *
+ * PG_reserved = 1: 该页面被内核保留，不能用于动态分配
+ * PG_reserved = 0: 该页面可以用于动态分配
+ *
+ * 保留页面通常包括：
+ * - 内核代码和数据段
+ * - 页表页面
+ * - 重要的内核数据结构
+ * - 引导时使用的内存区域
+ */
+#define PG_reserved                 0
+
+/**
+ * 空闲块属性标志位 (Position 1)
+ *
+ * PG_property = 1: 该页面是空闲内存块的头部，可以用于分配
+ * PG_property = 0: 该页面不是空闲块头部
+ *
+ * 用于伙伴系统等内存分配算法：
+ * - 空闲块头部：记录连续空闲页面的数量
+ * - 非头部页面：property字段设为0
+ * - 已分配页面：property字段无意义
+ */
+#define PG_property                 1
+
+/**
+ * ============================================================================
+ * 页面标志位操作宏
+ * ============================================================================
+ *
+ * 这些宏提供安全的位操作接口，避免直接位操作可能出现的错误。
+ */
+
+/** 设置页面为内核保留状态 */
 #define SetPageReserved(page)       set_bit(PG_reserved, &((page)->flags))
+
+/** 清除页面的内核保留状态 */
 #define ClearPageReserved(page)     clear_bit(PG_reserved, &((page)->flags))
+
+/** 检查页面是否为内核保留状态 */
 #define PageReserved(page)          test_bit(PG_reserved, &((page)->flags))
+
+/** 设置页面的空闲块属性 */
 #define SetPageProperty(page)       set_bit(PG_property, &((page)->flags))
+
+/** 清除页面的空闲块属性 */
 #define ClearPageProperty(page)     clear_bit(PG_property, &((page)->flags))
+
+/** 检查页面是否有空闲块属性 */
 #define PageProperty(page)          test_bit(PG_property, &((page)->flags))
 
-// convert list entry to page
+/**
+ * ============================================================================
+ * 链表操作宏
+ * ============================================================================
+ */
+
+/**
+ * 从链表节点转换为Page结构体指针
+ *
+ * 用于在遍历链表时从list_entry_t得到对应的Page结构体。
+ * 这个宏利用了结构体成员在结构体中的偏移量进行地址计算。
+ *
+ * @param le     链表节点指针
+ * @param member Page结构体中链表节点的成员名
+ * @return       Page结构体指针
+ */
 #define le2page(le, member)                 \
     to_struct((le), struct Page, member)
 
-/* free_area_t - maintains a doubly linked list to record free (unused) pages */
+/**
+ * @brief 空闲区域管理结构体
+ *
+ * 用于管理一组连续的空闲页面，采用双向链表组织。
+ * 这是物理内存管理器的核心数据结构之一。
+ */
 typedef struct {
-    list_entry_t free_list;         // the list header
-    unsigned int nr_free;           // # of free pages in this free list
+    /**
+     * 空闲页面链表头
+     *
+     * 所有空闲页面通过page_link字段链接到这个双向链表中。
+     * 分配时从链表头取页面，释放时插入链表。
+     */
+    list_entry_t free_list;
+
+    /**
+     * 空闲页面数量统计
+     *
+     * 记录当前空闲链表中有多少个页面。
+     * 用于快速查询可用内存数量，提高分配效率。
+     */
+    unsigned int nr_free;
 } free_area_t;
+
+/**
+ * ============================================================================
+ * 内存管理架构总结
+ * ============================================================================
+ *
+ * **物理内存管理层次**：
+ * 1. **硬件层面**：物理内存芯片、MMU分页硬件
+ * 2. **Page结构体**：物理页面的软件描述符
+ * 3. **free_area_t**：空闲页面组织和管理
+ * 4. **pmm_manager**：具体的分配算法实现
+ * 5. **虚拟内存层**：页表、地址映射、权限控制
+ *
+ * **关键设计原则**：
+ * - **安全性**：通过引用计数防止内存错误释放
+ * - **效率**：通过链表和位图实现快速分配释放
+ * - **灵活性**：支持多种分配算法和页面置换策略
+ * - **扩展性**：为后续虚拟内存功能预留接口
+ */
 
 #endif /* !__ASSEMBLER__ */
 
