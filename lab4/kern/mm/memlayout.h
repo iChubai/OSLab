@@ -55,7 +55,6 @@
  * 2. 方便进行地址转换计算
  * 3. 与物理地址有固定的偏移关系
  */
-#define KERNBASE            0xFFFFFFC0200000
 
 /**
  * 内核可以映射的最大物理内存量 (126MB)
@@ -86,13 +85,10 @@
  *
  * 计算：0xFFFFFFC04000000 - 0x0 = 0xFFFFFFC04000000
  */
-#define PHYSICAL_MEMORY_OFFSET      0xFFFFFFC04000000
 
 /**
  * 内核栈的大小设置
  */
-#define KSTACKPAGE          2                           /**< 内核栈占用的页数 */
-#define KSTACKSIZE          (KSTACKPAGE * PGSIZE)       /**< 内核栈总大小 (8KB) */
 
 /* All physical memory mapped at this address */
 #define KERNBASE            0xFFFFFFFFC0200000

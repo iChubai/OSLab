@@ -31,7 +31,7 @@ DTB init completed
 
 Special kernel symbols:
   entry  0xc020004a (virtual)
-  etext  0xc0203ed4 (virtual)
+  etext  0xc0203f1c (virtual)
   edata  0xc0209030 (virtual)
   end    0xc020d4e4 (virtual)
 Kernel executable memory footprint: 54KB
@@ -51,7 +51,7 @@ alloc_proc() correct!
 this initproc, pid = 1, name = "init"
 To U: "Hello world!!".
 To U: "en.., Bye, Bye. :)"
-kernel panic at kern/process/proc.c:778:
+kernel panic at kern/process/proc.c:905:
     process exit!!.
 
 Welcome to the kernel debug monitor!!
