@@ -31,10 +31,10 @@ DTB init completed
 
 Special kernel symbols:
   entry  0xc020004a (virtual)
-  etext  0xc0203f1c (virtual)
-  edata  0xc0209030 (virtual)
-  end    0xc020d4e4 (virtual)
-Kernel executable memory footprint: 54KB
+  etext  0xc0205702 (virtual)
+  edata  0xc02a6450 (virtual)
+  end    0xc02aa8fc (virtual)
+Kernel executable memory footprint: 683KB
 memory management: default_pmm_manager
 physcial memory map:
   memory: 0x08000000, [0x80000000, 0x87ffffff].
@@ -46,13 +46,18 @@ use SLOB allocator
 kmalloc_init() succeeded!
 check_vma_struct() succeeded!
 check_vmm() succeeded.
-alloc_proc() correct!
 ++ setup timer interrupts
-this initproc, pid = 1, name = "init"
-To U: "Hello world!!".
-To U: "en.., Bye, Bye. :)"
-kernel panic at kern/process/proc.c:905:
-    process exit!!.
+kernel_execve: pid = 2, name = "spin".
+Breakpoint
+I am the parent. Forking the child...
+I am the parent. Running the child...
+I am the child. spinning ...
+I am the parent.  Killing the child...
+kill returns 0
+wait returns 0
+spin may pass.
+all user-mode processes have quit.
+init check memory pass.
+kernel panic at kern/process/proc.c:522:
+    initproc exit.
 
-Welcome to the kernel debug monitor!!
-Type 'help' for a list of commands.

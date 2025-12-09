@@ -24,6 +24,8 @@ struct pmm_manager
 };
 
 extern const struct pmm_manager *pmm_manager;
+extern const struct pmm_manager best_fit_pmm_manager;
+extern const struct pmm_manager buddy_pmm_manager;
 extern pde_t *boot_pgdir_va;
 extern const size_t nbase;
 extern uintptr_t boot_pgdir_pa;
