@@ -15,6 +15,8 @@
 #include <sched.h>
 #include <sync.h>
 #include <sbi.h>
+#include <pmm.h>
+#include <string.h>
 
 #define TICK_NUM 100
 
@@ -42,7 +44,9 @@ void idt_init(void)
     set_csr(sstatus, SSTATUS_SUM);
 }
 
-/* trap_in_kernel - test if trap happened in kernel */
+// trap_in_kernel - 检查异常是否发生在内核模式
+// 通过检查sstatus寄存器的SPP位(SSTATUS_SPP)来判断
+// SPP=1: 内核模式, SPP=0: 用户模式
 bool trap_in_kernel(struct trapframe *tf)
 {
     return (tf->status & SSTATUS_SPP) != 0;
@@ -165,27 +169,29 @@ void interrupt_handler(struct trapframe *tf)
     }
 }
 void kernel_execve_ret(struct trapframe *tf, uintptr_t kstacktop);
+// exception_handler - 异常处理分发器，根据异常原因调用相应处理
+// tf: trapframe指针，包含异常发生时的完整上下文信息
 void exception_handler(struct trapframe *tf)
 {
     int ret;
-    switch (tf->cause)
+    switch (tf->cause)  // 根据异常原因(scause寄存器)进行分发
     {
-    case CAUSE_MISALIGNED_FETCH:
+    case CAUSE_MISALIGNED_FETCH:     // 指令地址未对齐
         cprintf("Instruction address misaligned\n");
         break;
-    case CAUSE_FETCH_ACCESS:
+    case CAUSE_FETCH_ACCESS:         // 指令访问错误(页错误)
         cprintf("Instruction access fault\n");
         break;
-    case CAUSE_ILLEGAL_INSTRUCTION:
+    case CAUSE_ILLEGAL_INSTRUCTION:  // 非法指令
         cprintf("Illegal instruction\n");
         break;
-    case CAUSE_BREAKPOINT:
+    case CAUSE_BREAKPOINT:           // 断点异常(ebreak指令)
         cprintf("Breakpoint\n");
-        if (tf->gpr.a7 == 10)
+        if (tf->gpr.a7 == 10)        // 特殊标识，表示内核系统调用
         {
-            tf->epc += 4;
-            syscall();
-            kernel_execve_ret(tf, current->kstack + KSTACKSIZE);
+            tf->epc += 4;           // 跳过ebreak指令
+            syscall();              // 执行系统调用
+            kernel_execve_ret(tf, current->kstack + KSTACKSIZE);  // 返回处理
         }
         break;
     case CAUSE_MISALIGNED_LOAD:
@@ -223,24 +229,59 @@ void exception_handler(struct trapframe *tf)
         cprintf("Load page fault\n");
         break;
     case CAUSE_STORE_PAGE_FAULT:
+    {
+        if (current != NULL && current->mm != NULL)
+        {
+            uintptr_t va = ROUNDDOWN(tf->tval, PGSIZE);
+            pte_t *ptep = get_pte(current->mm->pgdir, va, 0);
+            if (ptep != NULL && (*ptep & PTE_V) && (*ptep & PTE_COW))
+            {
+                uint32_t perm = (*ptep & PTE_USER);
+                struct Page *page = pte2page(*ptep);
+                if (page_ref(page) > 1)
+                {
+                    struct Page *npage = alloc_page();
+                    if (npage == NULL)
+                    {
+                        panic("COW: no mem\n");
+                    }
+                    memcpy(page2kva(npage), page2kva(page), PGSIZE);
+                    perm = (perm & ~PTE_COW) | PTE_W;
+                    if (page_insert(current->mm->pgdir, npage, va, perm) != 0)
+                    {
+                        panic("COW: insert fail\n");
+                    }
+                }
+                else
+                {
+                    perm = (perm & ~PTE_COW) | PTE_W;
+                    *ptep = pte_create(page2ppn(page), perm | PTE_V);
+                    tlb_invalidate(current->mm->pgdir, va);
+                }
+                break;
+            }
+        }
         cprintf("Store/AMO page fault\n");
         break;
+    }
     default:
         print_trapframe(tf);
         break;
     }
 }
 
+// trap_dispatch - 异常/中断分发器，根据cause值区分中断和异常
+// RISC-V中：cause最高位为1表示中断，为0表示异常
 static inline void trap_dispatch(struct trapframe *tf)
 {
-    if ((intptr_t)tf->cause < 0)
+    if ((intptr_t)tf->cause < 0)  // cause最高位为1，表示中断
     {
-        // interrupts
+        // interrupts - 调用中断处理函数
         interrupt_handler(tf);
     }
-    else
+    else  // cause最高位为0，表示异常
     {
-        // exceptions
+        // exceptions - 调用异常处理函数
         exception_handler(tf);
     }
 }
@@ -250,30 +291,37 @@ static inline void trap_dispatch(struct trapframe *tf)
  * the code in kern/trap/trapentry.S restores the old CPU state saved in the
  * trapframe and then uses the iret instruction to return from the exception.
  * */
+// trap - 异常/中断处理主函数
+// tf: 指向trapframe结构的指针，包含完整的异常上下文
 void trap(struct trapframe *tf)
 {
-    // dispatch based on what type of trap occurred
-    //    cputs("some trap");
+    // 根据异常类型进行分发处理
+    // 如果当前进程不存在(系统初始化阶段)，直接处理异常
     if (current == NULL)
     {
         trap_dispatch(tf);
     }
     else
     {
+        // 保存当前进程的旧trapframe指针
         struct trapframe *otf = current->tf;
+        // 设置当前进程的trapframe为新的异常上下文
         current->tf = tf;
-
+        // 判断异常是否发生在内核模式
         bool in_kernel = trap_in_kernel(tf);
-
+        // 根据异常类型进行具体处理(系统调用、页面错误等)
         trap_dispatch(tf);
-
+        // 恢复当前进程的原始trapframe
         current->tf = otf;
+        // 如果异常发生在用户模式，需要进行进程状态检查
         if (!in_kernel)
         {
+            // 如果进程正在退出，终止进程
             if (current->flags & PF_EXITING)
             {
                 do_exit(-E_KILLED);
             }
+            // 如果进程需要调度，执行调度
             if (current->need_resched)
             {
                 schedule();

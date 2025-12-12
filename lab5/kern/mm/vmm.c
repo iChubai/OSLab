@@ -37,7 +37,7 @@
 static void check_vmm(void);
 static void check_vma_struct(void);
 
-// mm_create -  alloc a mm_struct & initialize it.
+// mm_create - 分配并初始化mm_struct内存管理结构
 struct mm_struct *
 mm_create(void)
 {
@@ -45,9 +45,9 @@ mm_create(void)
 
     if (mm != NULL)
     {
-        list_init(&(mm->mmap_list));
-        mm->mmap_cache = NULL;
-        mm->pgdir = NULL;
+        list_init(&(mm->mmap_list));  // 初始化虚拟内存区域链表
+        mm->mmap_cache = NULL;         // 清空缓存指针
+        mm->pgdir = NULL;              // 清空页目录指针
         mm->map_count = 0;
 
         mm->sm_priv = NULL;
@@ -264,11 +264,11 @@ bool copy_to_user(struct mm_struct *mm, void *dst, const void *src, size_t len)
     return 1;
 }
 
-// vmm_init - initialize virtual memory management
-//          - now just call check_vmm to check correctness of vmm
+// vmm_init - 初始化虚拟内存管理
+// 目前主要用于检查虚拟内存管理机制的正确性
 void vmm_init(void)
 {
-    check_vmm();
+    check_vmm();  // 执行虚拟内存管理正确性检查
 }
 
 // check_vmm - check correctness of vmm

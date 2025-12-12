@@ -34,73 +34,75 @@ static void check_alloc_page(void);
 static void check_pgdir(void);
 static void check_boot_pgdir(void);
 
-// init_pmm_manager - initialize a pmm_manager instance
+// init_pmm_manager - 初始化物理内存管理器实例
 static void init_pmm_manager(void)
 {
-    pmm_manager = &default_pmm_manager;
+    pmm_manager = &default_pmm_manager;  // 设置默认内存管理器
     cprintf("memory management: %s\n", pmm_manager->name);
-    pmm_manager->init();
+    pmm_manager->init();                  // 初始化管理器
 }
 
-// init_memmap - call pmm->init_memmap to build Page struct for free memory
+// init_memmap - 调用pmm管理器的init_memmap建立空闲内存的Page结构
 static void init_memmap(struct Page *base, size_t n)
 {
-    pmm_manager->init_memmap(base, n);
+    pmm_manager->init_memmap(base, n);   // 初始化内存映射
 }
 
-// alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE
-// memory
+// alloc_pages - 分配连续的n个物理页面，线程安全
+// 关闭中断保护分配过程的原子性，返回页面描述符指针
 struct Page *alloc_pages(size_t n)
 {
     struct Page *page = NULL;
     bool intr_flag;
-    local_intr_save(intr_flag);
+    local_intr_save(intr_flag);  // 关闭中断，确保分配过程不被打断
     {
-        page = pmm_manager->alloc_pages(n);
+        page = pmm_manager->alloc_pages(n);  // 调用具体分配算法
     }
-    local_intr_restore(intr_flag);
+    local_intr_restore(intr_flag);  // 恢复中断状态
     return page;
 }
 
-// free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
+// free_pages - 释放连续的n个物理页面，线程安全
+// 关闭中断保护释放过程的原子性
 void free_pages(struct Page *base, size_t n)
 {
     bool intr_flag;
-    local_intr_save(intr_flag);
+    local_intr_save(intr_flag);  // 关闭中断，确保释放过程不被打断
     {
-        pmm_manager->free_pages(base, n);
+        pmm_manager->free_pages(base, n);  // 调用具体释放算法
     }
-    local_intr_restore(intr_flag);
+    local_intr_restore(intr_flag);  // 恢复中断状态
 }
 
-// nr_free_pages - call pmm->nr_free_pages to get the size (nr*PAGESIZE)
-// of current free memory
+// nr_free_pages - 获取当前空闲内存页面数量，线程安全
+// 返回空闲页面的总数，用于内存使用统计
 size_t nr_free_pages(void)
 {
     size_t ret;
     bool intr_flag;
-    local_intr_save(intr_flag);
+    local_intr_save(intr_flag);  // 关闭中断，确保查询过程不被打断
     {
-        ret = pmm_manager->nr_free_pages();
+        ret = pmm_manager->nr_free_pages();  // 调用具体查询算法
     }
     local_intr_restore(intr_flag);
     return ret;
 }
 
-/* pmm_init - initialize the physical memory management */
+// page_init - 初始化物理内存管理系统，设置页面管理结构
+// 计算物理内存大小，建立页面数组，初始化页表
 static void page_init(void)
 {
-    extern char kern_entry[];
+    extern char kern_entry[];  // 内核入口地址
 
-    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;  // 设置虚拟地址到物理地址的偏移
 
-    uint64_t mem_begin = get_memory_base();
-    uint64_t mem_size = get_memory_size();
+    uint64_t mem_begin = get_memory_base();  // 获取内存起始地址
+    uint64_t mem_size = get_memory_size();   // 获取内存大小
     if (mem_size == 0)
     {
-        panic("DTB memory info not available");
+        panic("DTB memory info not available");  // DTB中无内存信息
     }
-    uint64_t mem_end = mem_begin + mem_size;
+    uint64_t mem_end = mem_begin + mem_size;  // 计算内存结束地址
 
     cprintf("physcial memory map:\n");
     cprintf("  memory: 0x%08lx, [0x%08lx, 0x%08lx].\n", mem_size, mem_begin,
@@ -172,9 +174,13 @@ static void *boot_alloc_page(void)
     return page2kva(p);
 }
 
-// pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup
-// paging mechanism
-//         - check the correctness of pmm & paging mechanism, print PDT&PT
+// pmm_init - 初始化物理内存管理，建立页表机制
+// 步骤：
+// 1. 初始化物理内存管理器
+// 2. 建立页面管理结构
+// 3. 设置页目录和页表
+// 4. 启用分页机制
+// 5. 检查页表正确性
 void pmm_init(void)
 {
     // We need to alloc/free the physical memory (granularity is 4KB or other
@@ -388,37 +394,25 @@ int copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end,
             start = ROUNDDOWN(start + PTSIZE, PTSIZE);
             continue;
         }
-        // call get_pte to find process B's pte according to the addr start. If
-        // pte is NULL, just alloc a PT
         if (*ptep & PTE_V)
         {
             if ((nptep = get_pte(to, start, 1)) == NULL)
             {
                 return -E_NO_MEM;
             }
-            uint32_t perm = (*ptep & PTE_USER);
-            // get page from ptep
+            uint32_t perm = (*ptep & (PTE_USER | PTE_COW));
             struct Page *page = pte2page(*ptep);
-            // alloc a page for process B
-            struct Page *npage = alloc_page();
-            assert(page != NULL);
-            assert(npage != NULL);
-            int ret = 0;
-            /* LAB5:EXERCISE2 YOUR CODE
-             * replicate content of page to npage, build the map of phy addr of
-             * nage with the linear addr start
-             */
-            void *src_kvaddr = page2kva(page);
-            void *dst_kvaddr = page2kva(npage);
-            memcpy(dst_kvaddr, src_kvaddr, PGSIZE);
-            ret = page_insert(to, npage, start, perm);
+            if (perm & PTE_W)
+            {
+                perm = (perm & ~PTE_W) | PTE_COW;
+                *ptep = (*ptep & ~PTE_W) | PTE_COW;
+                tlb_invalidate(from, start);
+            }
+            int ret = page_insert(to, page, start, perm);
             if (ret != 0)
             {
-                free_page(npage);
                 return ret;
             }
-
-            assert(ret == 0);
         }
         start += PGSIZE;
     } while (start != 0 && start < end);

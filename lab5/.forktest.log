@@ -31,10 +31,10 @@ DTB init completed
 
 Special kernel symbols:
   entry  0xc020004a (virtual)
-  etext  0xc0205702 (virtual)
-  edata  0xc02a6450 (virtual)
-  end    0xc02aa8fc (virtual)
-Kernel executable memory footprint: 683KB
+  etext  0xc02057fe (virtual)
+  edata  0xc02b0ca0 (virtual)
+  end    0xc02b514c (virtual)
+Kernel executable memory footprint: 725KB
 memory management: default_pmm_manager
 physcial memory map:
   memory: 0x08000000, [0x80000000, 0x87ffffff].
@@ -49,9 +49,11 @@ check_vmm() succeeded.
 ++ setup timer interrupts
 kernel_execve: pid = 2, name = "forktest".
 Breakpoint
-I am child 2
-I am child 1
-I am child 0
+I am child 23
+I am child 22
+I am child 21
+I am child 20
+I am child 19
 I am child 18
 I am child 17
 I am child 16
@@ -59,28 +61,26 @@ I am child 15
 I am child 14
 I am child 13
 I am child 12
-I I am child 10
+I am child 11
+I am child 10
 I am child 9
 I am child 8
 I am child 7
-II am child 5
+I am child 6
+I am child 5
 I am child 4
 I am child 3
-I am child 25
-I am child 24
-I am child 23
-I am child 22
-I am child 21
-I am child 20
-I am child 19
-am child 11
- am child 6
-I am child 26
+I am child 2
+I am child 1
+I am child 0
 I am child 31
 I am child 30
 I am child 29
 I am child 28
 I am child 27
+I am child 26
+I am child 25
+I am child 24
 forktest pass.
 all user-mode processes have quit.
 init check memory pass.

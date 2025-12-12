@@ -3,13 +3,12 @@
 #include <string.h>
 #include <default_pmm.h>
 
-/* In the first fit algorithm, the allocator keeps a list of free blocks (known as the free list) and,
-   on receiving a request for memory, scans along the list for the first block that is large enough to
-   satisfy the request. If the chosen block is significantly larger than that requested, then it is
-   usually split, and the remainder added to the list as another free block.
-   Please see Page 196~198, Section 8.2 of Yan Wei Min's chinese book "Data Structure -- C programming language"
-*/
-// you should rewrite functions: default_init,default_init_memmap,default_alloc_pages, default_free_pages.
+// First Fit内存分配算法实现
+// 算法原理：维护空闲块链表，分配时从头开始查找第一个足够大的空闲块
+// 如果找到的块远大于请求大小，则分割并将剩余部分重新加入空闲链表
+// 参考严蔚敏《数据结构-C语言版》第196~198页，第8.2节
+//
+// 需要实现的函数：default_init, default_init_memmap, default_alloc_pages, default_free_pages
 /*
  * Details of FFMA
  * (1) Prepare: In order to implement the First-Fit Mem Alloc (FFMA), we should manage the free mem block use some list.
@@ -59,12 +58,16 @@ free_area_t free_area;
 #define nr_free (free_area.nr_free)
 
 static void
+// default_init - 初始化默认物理内存管理器
+// 初始化空闲链表和空闲页面计数器
 default_init(void)
 {
-    list_init(&free_list);
-    nr_free = 0;
+    list_init(&free_list);  // 初始化空闲页面链表
+    nr_free = 0;           // 空闲页面数置0
 }
 
+// default_init_memmap - 初始化一块连续内存区域的页面管理结构
+// base: 起始页面指针, n: 页面数量
 static void
 default_init_memmap(struct Page *base, size_t n)
 {
@@ -102,11 +105,13 @@ default_init_memmap(struct Page *base, size_t n)
     }
 }
 
+// default_alloc_pages - First Fit算法分配n个连续页面
+// 从空闲链表头部开始查找第一个足够大的空闲块
 static struct Page *
 default_alloc_pages(size_t n)
 {
     assert(n > 0);
-    if (n > nr_free)
+    if (n > nr_free)  // 检查是否有足够的空闲页面
     {
         return NULL;
     }
@@ -138,11 +143,13 @@ default_alloc_pages(size_t n)
     return page;
 }
 
+// default_free_pages - 释放n个连续页面到空闲链表
+// 可能需要与相邻空闲块合并以减少碎片
 static void
 default_free_pages(struct Page *base, size_t n)
 {
     assert(n > 0);
-    struct Page *p = base;
+    struct Page *p = base;  // 起始页面指针
     for (; p != base + n; p++)
     {
         assert(!PageReserved(p) && !PageProperty(p));
