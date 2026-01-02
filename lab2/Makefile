@@ -10,7 +10,7 @@ GCCPREFIX := riscv64-unknown-elf-
 #endif
 
 ifndef QEMU
-QEMU := qemu-system-riscv64
+QEMU := /defaultShare/archive/yinbowen/Houjd/study/qemu-4.1.1/riscv64-softmmu/qemu-system-riscv64
 endif
 
 ifndef SPIKE
@@ -175,11 +175,153 @@ debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 		-device loader,file=$(UCOREIMG),addr=0x80200000\
 		-s -S
 
+# ============================================================================
+# GDB调试目标配置
+# ============================================================================
+# 用法说明:
+#   make gdb          - 连接到QEMU GDB stub (端口1234) 调试ucore内核
+#   make gdbserver    - 启动本地GDB调试QEMU源码
+#   make gdb-port-5678 - 连接到指定端口调试ucore (例如端口5678)
+#
+# gdbserver调试流程:
+#   1. 终端1: gdbserver localhost:12345 /path/to/qemu ... -s -S
+#   2. 终端2: make gdbserver  (连接12345端口调试QEMU源码)
+#   3. 终端3: make gdb       (连接1234端口调试ucore内核)
+
+# gdbserver mode - 调试QEMU源码用
+gdbserver:
+	gdb \
+    -ex 'file /defaultShare/archive/yinbowen/Houjd/study/qemu-4.1.1/riscv64-softmmu/qemu-system-riscv64' \
+    -ex 'target remote localhost:12345' \
+    -ex 'break get_physical_address if addr == 0xffffffffc0204000' \
+    -ex 'handle SIGPIPE nostop noprint'
+
+# 启动gdbserver后台进程
+debug-start:
+	@echo "=== 启动gdbserver ==="
+	@gdbserver localhost:12345 $(QEMU) -machine virt -nographic -bios default -device loader,file=$(UCOREIMG),addr=0x80200000 -s -S &
+	@echo "等待QEMU初始化..."
+	@sleep 5
+	@echo "检查gdbserver端口..."
+	@until netstat -tlnp | grep -q ":12345.*gdbserver"; do sleep 1; done
+	@echo "gdbserver启动成功，监听端口12345"
+	@echo "等待QEMU GDB stub开放..."
+	@sleep 15
+	@echo "检查QEMU GDB stub端口..."
+	@until netstat -tlnp | grep -q ":1234.*qemu-system"; do sleep 1; done
+	@echo "QEMU GDB stub开放，端口1234"
+	@echo "现在可以在终端2运行: make debug-qemu"
+	@echo "然后在终端3运行: make debug-ucore"
+
+# QEMU GDB会话 - 设置页表翻译断点
+debug-qemu:
+	@echo "=== 启动QEMU GDB (观察页表翻译) ==="
+	@echo "注意: GDB会保持运行状态，请手动输入 continue 让QEMU继续运行"
+	gdb $(QEMU) \
+    -ex 'target remote localhost:12345' \
+    -ex 'break get_physical_address' \
+    -ex 'handle SIGPIPE nostop noprint'
+
+# RISC-V GDB会话 - 触发页表翻译
+debug-ucore:
+	@echo "=== 启动RISC-V GDB (触发页表翻译) ==="
+	@echo "确保QEMU GDB stub (端口1234) 已经开放..."
+	@netstat -tlnp | grep -q ":1234.*qemu-system" || (echo "错误: QEMU GDB stub未开放，请先运行终端1的make debug-start"; exit 1)
+	riscv64-unknown-elf-gdb \
+    -ex 'file bin/kernel' \
+    -ex 'set arch riscv:rv64' \
+    -ex 'target remote localhost:1234' \
+    -ex 'break pmm_init' \
+    -ex 'echo === RISC-V GDB连接成功 ===' \
+    -ex 'echo 现在输入 continue 开始ucore执行' \
+    -ex 'echo 当看到 satp virtual address: 0xffffffffc0204000 时' \
+    -ex 'echo 终端2的QEMU GDB会触发页表翻译断点'
+
+# 最终测试 - 确认页表翻译断点可以触发
+debug-final:
+	@echo "=== 最终确认：页表翻译断点可以触发 ==="
+	@gdbserver localhost:12345 $(QEMU) -machine virt -nographic -bios default -device loader,file=$(UCOREIMG),addr=0x80200000 -s -S &
+	@sleep 3
+	@echo "启动QEMU GDB，设置断点并自动continue..."
+	@gdb $(QEMU) \
+	  -ex 'target remote localhost:12345' \
+	  -ex 'break get_physical_address' \
+	  -ex 'handle SIGPIPE nostop noprint' \
+	  -ex 'commands 1' \
+	  -ex 'printf "页表翻译断点触发！地址=0x%lx\n", addr' \
+	  -ex 'bt 3' \
+	  -ex 'continue' \
+	  -ex 'end' \
+	  -ex 'continue' &
+	@sleep 15
+	@echo "启动RISC-V GDB触发页表翻译..."
+	@riscv64-unknown-elf-gdb \
+	  -ex 'file bin/kernel' \
+	  -ex 'set arch riscv:rv64' \
+	  -ex 'target remote localhost:1234' \
+	  -ex 'break pmm_init' \
+	  -ex 'continue' 2>&1 | grep -E "(satp virtual address|页表翻译断点)" | head -5
+
+# 完整调试指导
+debug-guide:
+	@echo "========================================"
+	@echo "  页表翻译调试完整指南"
+	@echo "========================================"
+	@echo ""
+	@echo "⚠️ 重要：严格按时序执行，每个步骤都要等待完成！"
+	@echo ""
+	@echo "步骤1 - 终端1 (启动gdbserver):"
+	@echo "  make debug-start"
+	@echo "  等待: 'QEMU GDB stub开放，端口1234'"
+	@echo ""
+	@echo "步骤2 - 终端2 (QEMU GDB):"
+	@echo "  make debug-qemu"
+	@echo "  在GDB提示符下输入: continue"
+	@echo "  等待: 看到大量库加载消息"
+	@echo ""
+	@echo "步骤3 - 终端3 (RISC-V GDB):"
+	@echo "  make debug-ucore"
+	@echo "  在GDB提示符下输入: continue"
+	@echo "  等待: 'satp virtual address: 0xffffffffc0204000'"
+	@echo ""
+	@echo "关键观察点："
+	@echo "- 终端3显示 'satp virtual address: 0xffffffffc0204000' 时"
+	@echo "- 终端2应该立即触发 get_physical_address 断点"
+	@echo "- 断点触发时检查: printf \"地址: 0x%lx\\n\", addr"
+	@echo ""
+	@echo "========================================"
+
+# 重置调试环境
+debug-reset:
+	@echo "=== 重置调试环境 ==="
+	-pkill -f gdbserver
+	-pkill -f gdb
+	-pkill -f riscv64
+	-pkill -f qemu-system
+	@echo "所有调试进程已清理"
+
+# ucore mode - 调试ucore内核用 (默认1234端口)
 gdb:
 	riscv64-unknown-elf-gdb \
     -ex 'file bin/kernel' \
     -ex 'set arch riscv:rv64' \
     -ex 'target remote localhost:1234'
+
+# 自定义端口版本 - make gdb-port-端口号
+gdb-port-%:
+	riscv64-unknown-elf-gdb \
+    -ex 'file bin/kernel' \
+    -ex 'set arch riscv:rv64' \
+    -ex 'target remote localhost:$*'
+
+# 触发页表翻译断点 - 在RISC-V GDB中设置断点并continue
+gdb-trigger:
+	riscv64-unknown-elf-gdb \
+    -ex 'file bin/kernel' \
+    -ex 'set arch riscv:rv64' \
+    -ex 'target remote localhost:1234' \
+    -ex 'break pmm_init' \
+    -ex 'continue'
 
 test: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \

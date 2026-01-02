@@ -90,7 +90,7 @@ show_final() {
 
 show_time() {
     t1=$(get_time)
-    time=`echo "scale=1; ($t1-$t0)/1" | $sed 's/.N/.0/g' | $bc 2> /dev/null`
+    time=`echo "$t0 $t1" | $sed 's/\\.N/.0/g' | $awk '{printf "%.1f", ($2-$1)}'`
     echo "(${time}s)"
 }
 
@@ -123,52 +123,27 @@ fail() {
 }
 
 run_qemu() {
-    # Run qemu with serial output redirected to $qemu_out. If $brkfun is non-empty,
-    # wait until $brkfun is reached or $timeout expires, then kill QEMU
-    qemuextra=
-    if [ "$brkfun" ]; then
-        qemuextra="-S $qemugdb"
-    fi
-
+    # Run qemu with serial output redirected to $qemu_out.
     if [ -z "$timeout" ] || [ $timeout -le 0 ]; then
         timeout=$default_timeout;
     fi
 
+    $rm $qemu_out > /dev/null 2>&1
+
     t0=$(get_time)
     (
         ulimit -t $timeout
-        exec $qemu -nographic $qemuopts -serial file:$qemu_out -monitor null -no-reboot $qemuextra
-    ) > $out 2> $err &
-    pid=$!
-
-    # wait for QEMU to start
-    sleep 1
-
-    if [ -n "$brkfun" ]; then
-        # find the address of the kernel $brkfun function
-        brkaddr=`$grep " $brkfun\$" $sym_table | $sed -e's/ .*$//g'`
-        brkaddr_phys=`echo $brkaddr | sed "s/^c0/00/g"`
-        (
-            echo "target remote localhost:$gdbport"
-            echo "break *0x$brkaddr"
-            if [ "$brkaddr" != "$brkaddr_phys" ]; then
-                echo "break *0x$brkaddr_phys"
-            fi
-            echo "continue"
-        ) > $gdb_in
-
-        $gdb -batch -nx -x $gdb_in > /dev/null 2>&1
-
-        # make sure that QEMU is dead
-        # on OS X, exiting gdb doesn't always exit qemu
-        kill $pid > /dev/null 2>&1
-    fi
+        exec $qemu -nographic $qemuopts -serial file:$qemu_out -monitor null -no-reboot
+    ) > $out 2> $err
 }
 
 build_run() {
     # usage: build_run <tag> <args>
     show_build_tag "$1"
     shift
+
+    # Ensure rebuild triggers even on coarse mtime filesystems.
+    sleep 1
 
     if $verbose; then
         echo "$make $@ ..."
@@ -326,9 +301,6 @@ swapimg=$(make_print swapimg)
 
 ## set default qemu-options
 qemuopts="-machine virt -nographic -bios default -device loader,file=bin/ucore.img,addr=0x80200000"
-
-## set break-function, default is readline
-brkfun=readline
 
 default_check() {
     pts=7

@@ -72,6 +72,21 @@ static int sys_lab6_set_priority(uint64_t arg[]){
     lab6_set_priority(priority);
     return 0;
 }
+static int sys_sched_set_burst(uint64_t arg[]){
+    uint32_t expected = (uint32_t)arg[0];
+    uint32_t remaining = (uint32_t)arg[1];
+    sched_set_burst(expected, remaining);
+    return 0;
+}
+static int sys_sched_set_nice(uint64_t arg[]){
+    int nice = (int)arg[0];
+    sched_set_nice(nice);
+    return 0;
+}
+static int sys_sched_get_runtime(uint64_t arg[]){
+    (void)arg;
+    return (int)current->sched_runtime_ticks;
+}
 static int (*syscalls[])(uint64_t arg[]) = {
     [SYS_exit]              sys_exit,
     [SYS_fork]              sys_fork,
@@ -83,7 +98,10 @@ static int (*syscalls[])(uint64_t arg[]) = {
     [SYS_putc]              sys_putc,
     [SYS_pgdir]             sys_pgdir,
     [SYS_gettime]           sys_gettime,
-    [SYS_lab6_set_priority]  sys_lab6_set_priority,
+    [SYS_sched_get_runtime] sys_sched_get_runtime,
+    [SYS_sched_set_burst]   sys_sched_set_burst,
+    [SYS_sched_set_nice]    sys_sched_set_nice,
+    [SYS_lab6_set_priority] sys_lab6_set_priority,
 };
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))
@@ -108,4 +126,3 @@ syscall(void) {
     panic("undefined syscall %d, pid = %d, name = %s.\n",
             num, current->pid, current->name);
 }
-

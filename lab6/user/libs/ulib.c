@@ -56,3 +56,21 @@ lab6_setpriority(uint32_t priority)
 {
     sys_lab6_set_priority(priority);
 }
+
+void
+sched_set_burst(uint32_t expected, uint32_t remaining)
+{
+    sys_sched_set_burst(expected, remaining);
+}
+
+void
+sched_set_nice(int nice)
+{
+    sys_sched_set_nice(nice);
+}
+
+int
+sched_get_runtime(void)
+{
+    return sys_sched_get_runtime();
+}

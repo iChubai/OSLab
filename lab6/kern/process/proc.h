@@ -65,6 +65,14 @@ struct proc_struct
     skew_heap_entry_t lab6_run_pool;        // FOR LAB6 ONLY: the entry in the run pool
     uint32_t lab6_stride;                   // FOR LAB6 ONLY: the current stride of the process
     uint32_t lab6_priority;                 // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
+    uint32_t sched_expected;                // estimated service time (ticks) for SJF/HRRN
+    uint32_t sched_remaining;               // remaining service time (ticks) for SRTF
+    uint32_t sched_wait_start;              // wait start tick for HRRN/metrics
+    uint32_t sched_last_start;              // last run start tick for metrics
+    uint32_t sched_runtime_ticks;           // total runtime ticks (metrics)
+    uint64_t sched_vruntime;                // CFS virtual runtime
+    int sched_qlevel;                       // MLFQ queue level
+    int sched_nice;                         // CFS nice value (-20..19)
 };
 
 #define PF_EXITING 0x00000001 // getting shutdown
@@ -87,6 +95,9 @@ void cpu_idle(void) __attribute__((noreturn));
 
 // FOR LAB6, set the process's priority (bigger value will get more CPU time)
 void lab6_set_priority(uint32_t priority);
+// set scheduler parameters for testing
+void sched_set_burst(uint32_t expected, uint32_t remaining);
+void sched_set_nice(int nice);
 
 struct proc_struct *find_proc(int pid);
 int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf);

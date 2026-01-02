@@ -86,3 +86,21 @@ sys_lab6_set_priority(uint64_t priority)
 {
     syscall(SYS_lab6_set_priority, priority);
 }
+
+void
+sys_sched_set_burst(uint32_t expected, uint32_t remaining)
+{
+    syscall(SYS_sched_set_burst, expected, remaining);
+}
+
+void
+sys_sched_set_nice(int nice)
+{
+    syscall(SYS_sched_set_nice, (uint64_t)nice);
+}
+
+int
+sys_sched_get_runtime(void)
+{
+    return syscall(SYS_sched_get_runtime);
+}

@@ -245,6 +245,7 @@ static inline void
 lsatp(unsigned long pgdir)
 {
   write_csr(satp, 0x8000000000000000 | (pgdir >> RISCV_PGSHIFT));
+  asm volatile("sfence.vma" ::: "memory");
 }
 
 #endif

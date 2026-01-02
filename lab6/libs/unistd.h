@@ -20,6 +20,10 @@
 #define SYS_shmem 22
 #define SYS_putc 30
 #define SYS_pgdir 31
+// scheduler tuning for tests
+#define SYS_sched_get_runtime 252
+#define SYS_sched_set_burst 253
+#define SYS_sched_set_nice 254
 /*only for lab6*/
 #define SYS_lab6_set_priority 255
 

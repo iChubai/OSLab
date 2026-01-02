@@ -49,7 +49,7 @@ ffffffffc0200034:	18029073          	csrw	satp,t0
     sfence.vma
 ffffffffc0200038:	12000073          	sfence.vma
     # 从此，我们给内核搭建出了一个完美的虚拟内存空间！
-    #nop # 可能映射的位置有些bug。。插入一个nop
+    #nop # 插入一个nop
     
     # 我们在虚拟内存空间中：随意将 sp 设置为虚拟地址！
     lui sp, %hi(bootstacktop)
@@ -839,10 +839,10 @@ ffffffffc02005c8:	0ff57513          	zext.b	a0,a0
 ffffffffc02005cc:	4880106f          	j	ffffffffc0201a54 <sbi_console_putchar>
 
 ffffffffc02005d0 <alloc_pages>:
-}
-
-// alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE
-// memory
+ * 
+ * @param n 要分配的页面数量
+ * @return 分配成功返回起始Page结构体指针，失败返回NULL
+ */
 struct Page *alloc_pages(size_t n) {
     return pmm_manager->alloc_pages(n);
 ffffffffc02005d0:	0000a797          	auipc	a5,0xa
@@ -851,9 +851,10 @@ ffffffffc02005d8:	6f9c                	ld	a5,24(a5)
 ffffffffc02005da:	8782                	jr	a5
 
 ffffffffc02005dc <free_pages>:
-}
-
-// free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
+ * 
+ * @param base 要释放页面的起始Page结构体
+ * @param n    要释放的页面数量
+ */
 void free_pages(struct Page *base, size_t n) {
     pmm_manager->free_pages(base, n);
 ffffffffc02005dc:	0000a797          	auipc	a5,0xa
@@ -862,10 +863,10 @@ ffffffffc02005e4:	739c                	ld	a5,32(a5)
 ffffffffc02005e6:	8782                	jr	a5
 
 ffffffffc02005e8 <nr_free_pages>:
-}
-
-// nr_free_pages - call pmm->nr_free_pages to get the size (nr*PAGESIZE)
-// of current free memory
+ * 调用具体PMM管理器的nr_free_pages方法来获取当前空闲内存的大小。
+ * 
+ * @return 当前空闲页面的数量
+ */
 size_t nr_free_pages(void) {
     return pmm_manager->nr_free_pages();
 ffffffffc02005e8:	0000a797          	auipc	a5,0xa
@@ -874,7 +875,7 @@ ffffffffc02005f0:	779c                	ld	a5,40(a5)
 ffffffffc02005f2:	8782                	jr	a5
 
 ffffffffc02005f4 <pmm_init>:
-    pmm_manager = &best_fit_pmm_manager;
+    pmm_manager = &best_fit_pmm_manager;        // 选择内存管理算法 - Select memory management algorithm
 ffffffffc02005f4:	00005797          	auipc	a5,0x5
 ffffffffc02005f8:	17478793          	addi	a5,a5,372 # ffffffffc0205768 <best_fit_pmm_manager>
     cprintf("memory management: %s\n", pmm_manager->name);
@@ -890,7 +891,7 @@ ffffffffc0200600:	f022                	sd	s0,32(sp)
     cprintf("memory management: %s\n", pmm_manager->name);
 ffffffffc0200602:	00005517          	auipc	a0,0x5
 ffffffffc0200606:	c5e50513          	addi	a0,a0,-930 # ffffffffc0205260 <boot_page_table_sv39+0x1260>
-    pmm_manager = &best_fit_pmm_manager;
+    pmm_manager = &best_fit_pmm_manager;        // 选择内存管理算法 - Select memory management algorithm
 ffffffffc020060a:	0000a417          	auipc	s0,0xa
 ffffffffc020060e:	b1640413          	addi	s0,s0,-1258 # ffffffffc020a120 <pmm_manager>
 void pmm_init(void) {
@@ -899,45 +900,45 @@ ffffffffc0200614:	ec26                	sd	s1,24(sp)
 ffffffffc0200616:	e44e                	sd	s3,8(sp)
 ffffffffc0200618:	e84a                	sd	s2,16(sp)
 ffffffffc020061a:	e052                	sd	s4,0(sp)
-    pmm_manager = &best_fit_pmm_manager;
+    pmm_manager = &best_fit_pmm_manager;        // 选择内存管理算法 - Select memory management algorithm
 ffffffffc020061c:	e01c                	sd	a5,0(s0)
     cprintf("memory management: %s\n", pmm_manager->name);
 ffffffffc020061e:	b2fff0ef          	jal	ra,ffffffffc020014c <cprintf>
-    pmm_manager->init();
+    pmm_manager->init();                        // 初始化选定的管理器 - Initialize selected manager
 ffffffffc0200622:	601c                	ld	a5,0(s0)
     va_pa_offset = PHYSICAL_MEMORY_OFFSET;
 ffffffffc0200624:	0000a497          	auipc	s1,0xa
 ffffffffc0200628:	b1448493          	addi	s1,s1,-1260 # ffffffffc020a138 <va_pa_offset>
-    pmm_manager->init();
+    pmm_manager->init();                        // 初始化选定的管理器 - Initialize selected manager
 ffffffffc020062c:	679c                	ld	a5,8(a5)
 ffffffffc020062e:	9782                	jalr	a5
     va_pa_offset = PHYSICAL_MEMORY_OFFSET;
 ffffffffc0200630:	57f5                	li	a5,-3
 ffffffffc0200632:	07fa                	slli	a5,a5,0x1e
 ffffffffc0200634:	e09c                	sd	a5,0(s1)
-    uint64_t mem_begin = get_memory_base();
+    uint64_t mem_begin = get_memory_base();     // 内存起始物理地址 - Memory start physical address
 ffffffffc0200636:	f7dff0ef          	jal	ra,ffffffffc02005b2 <get_memory_base>
 ffffffffc020063a:	89aa                	mv	s3,a0
-    uint64_t mem_size  = get_memory_size();
+    uint64_t mem_size  = get_memory_size();     // 内存总大小 - Total memory size
 ffffffffc020063c:	f81ff0ef          	jal	ra,ffffffffc02005bc <get_memory_size>
     if (mem_size == 0) {
 ffffffffc0200640:	16050063          	beqz	a0,ffffffffc02007a0 <pmm_init+0x1ac>
-    uint64_t mem_end   = mem_begin + mem_size;
+    uint64_t mem_end   = mem_begin + mem_size;  // 内存结束物理地址 - Memory end physical address
 ffffffffc0200644:	892a                	mv	s2,a0
     cprintf("physcial memory map:\n");
 ffffffffc0200646:	00005517          	auipc	a0,0x5
 ffffffffc020064a:	c6250513          	addi	a0,a0,-926 # ffffffffc02052a8 <boot_page_table_sv39+0x12a8>
 ffffffffc020064e:	affff0ef          	jal	ra,ffffffffc020014c <cprintf>
-    uint64_t mem_end   = mem_begin + mem_size;
+    uint64_t mem_end   = mem_begin + mem_size;  // 内存结束物理地址 - Memory end physical address
 ffffffffc0200652:	01298a33          	add	s4,s3,s2
-    cprintf("  memory: 0x%016lx, [0x%016lx, 0x%016lx].\n", mem_size, mem_begin,
+    cprintf("  memory: 0x%016lx, [0x%016lx, 0x%016lx].\n", mem_size, mem_begin, mem_end - 1);
 ffffffffc0200656:	864e                	mv	a2,s3
 ffffffffc0200658:	fffa0693          	addi	a3,s4,-1
 ffffffffc020065c:	85ca                	mv	a1,s2
 ffffffffc020065e:	00005517          	auipc	a0,0x5
 ffffffffc0200662:	c6250513          	addi	a0,a0,-926 # ffffffffc02052c0 <boot_page_table_sv39+0x12c0>
 ffffffffc0200666:	ae7ff0ef          	jal	ra,ffffffffc020014c <cprintf>
-    npage = maxpa / PGSIZE;
+    npage = maxpa / PGSIZE;                     // 总页面数 - Total page count
 ffffffffc020066a:	c80007b7          	lui	a5,0xc8000
 ffffffffc020066e:	8652                	mv	a2,s4
 ffffffffc0200670:	0d47e763          	bltu	a5,s4,ffffffffc020073e <pmm_init+0x14a>
@@ -980,7 +981,7 @@ ffffffffc02006ce:	96ae                	add	a3,a3,a1
 ffffffffc02006d0:	c02007b7          	lui	a5,0xc0200
 ffffffffc02006d4:	0af6ea63          	bltu	a3,a5,ffffffffc0200788 <pmm_init+0x194>
 ffffffffc02006d8:	6098                	ld	a4,0(s1)
-    mem_end = ROUNDDOWN(mem_end, PGSIZE);
+    mem_end = ROUNDDOWN(mem_end, PGSIZE);       // 向下对齐到页边界 - Round down to page boundary
 ffffffffc02006da:	77fd                	lui	a5,0xfffff
 ffffffffc02006dc:	00fa75b3          	and	a1,s4,a5
     uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * (npage - nbase));
@@ -1031,10 +1032,10 @@ ffffffffc0200736:	c3650513          	addi	a0,a0,-970 # ffffffffc0205368 <boot_pa
 ffffffffc020073a:	6145                	addi	sp,sp,48
     cprintf("satp virtual address: 0x%016lx\nsatp physical address: 0x%016lx\n", satp_virtual, satp_physical);
 ffffffffc020073c:	bc01                	j	ffffffffc020014c <cprintf>
-    npage = maxpa / PGSIZE;
+    npage = maxpa / PGSIZE;                     // 总页面数 - Total page count
 ffffffffc020073e:	c8000637          	lui	a2,0xc8000
 ffffffffc0200742:	bf0d                	j	ffffffffc0200674 <pmm_init+0x80>
-    mem_begin = ROUNDUP(freemem, PGSIZE);
+    mem_begin = ROUNDUP(freemem, PGSIZE);       // 向上对齐到页边界 - Round up to page boundary
 ffffffffc0200744:	6705                	lui	a4,0x1
 ffffffffc0200746:	177d                	addi	a4,a4,-1
 ffffffffc0200748:	96ba                	add	a3,a3,a4
@@ -1069,21 +1070,21 @@ ffffffffc020076e:	bfa5                	j	ffffffffc02006e6 <pmm_init+0xf2>
         panic("pa2page called with invalid pa");
 ffffffffc0200770:	00005617          	auipc	a2,0x5
 ffffffffc0200774:	ba860613          	addi	a2,a2,-1112 # ffffffffc0205318 <boot_page_table_sv39+0x1318>
-ffffffffc0200778:	06a00593          	li	a1,106
+ffffffffc0200778:	08500593          	li	a1,133
 ffffffffc020077c:	00005517          	auipc	a0,0x5
 ffffffffc0200780:	bbc50513          	addi	a0,a0,-1092 # ffffffffc0205338 <boot_page_table_sv39+0x1338>
 ffffffffc0200784:	a3fff0ef          	jal	ra,ffffffffc02001c2 <__panic>
     uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * (npage - nbase));
 ffffffffc0200788:	00005617          	auipc	a2,0x5
 ffffffffc020078c:	b6860613          	addi	a2,a2,-1176 # ffffffffc02052f0 <boot_page_table_sv39+0x12f0>
-ffffffffc0200790:	06000593          	li	a1,96
+ffffffffc0200790:	09700593          	li	a1,151
 ffffffffc0200794:	00005517          	auipc	a0,0x5
 ffffffffc0200798:	b0450513          	addi	a0,a0,-1276 # ffffffffc0205298 <boot_page_table_sv39+0x1298>
 ffffffffc020079c:	a27ff0ef          	jal	ra,ffffffffc02001c2 <__panic>
         panic("DTB memory info not available");
 ffffffffc02007a0:	00005617          	auipc	a2,0x5
 ffffffffc02007a4:	ad860613          	addi	a2,a2,-1320 # ffffffffc0205278 <boot_page_table_sv39+0x1278>
-ffffffffc02007a8:	04800593          	li	a1,72
+ffffffffc02007a8:	07c00593          	li	a1,124
 ffffffffc02007ac:	00005517          	auipc	a0,0x5
 ffffffffc02007b0:	aec50513          	addi	a0,a0,-1300 # ffffffffc0205298 <boot_page_table_sv39+0x1298>
 ffffffffc02007b4:	a0fff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -1091,32 +1092,33 @@ ffffffffc02007b4:	a0fff0ef          	jal	ra,ffffffffc02001c2 <__panic>
 ffffffffc02007b8:	86ae                	mv	a3,a1
 ffffffffc02007ba:	00005617          	auipc	a2,0x5
 ffffffffc02007be:	b3660613          	addi	a2,a2,-1226 # ffffffffc02052f0 <boot_page_table_sv39+0x12f0>
-ffffffffc02007c2:	07f00593          	li	a1,127
+ffffffffc02007c2:	0b900593          	li	a1,185
 ffffffffc02007c6:	00005517          	auipc	a0,0x5
 ffffffffc02007ca:	ad250513          	addi	a0,a0,-1326 # ffffffffc0205298 <boot_page_table_sv39+0x1298>
 ffffffffc02007ce:	9f5ff0ef          	jal	ra,ffffffffc02001c2 <__panic>
 
 ffffffffc02007d2 <free_in_list>:
-        cache->full = sp;
-    }
-    return obj;
-}
-
+ * @param list_head 链表头指针的地址
+ * @param cache     目标缓存
+ * @param ptr       要释放的对象指针
+ * @return 找到并释放返回1，未找到返回0
+ */
 static int free_in_list(slab_page_t **list_head, kmem_cache_t *cache, void *ptr) {
 ffffffffc02007d2:	1141                	addi	sp,sp,-16
 ffffffffc02007d4:	e022                	sd	s0,0(sp)
+    // 遍历链表寻找包含该地址的页面 - Traverse list to find page containing the address
     for (slab_page_t *sp = *list_head, *prev = NULL; sp != NULL; prev = sp, sp = sp->next) {
 ffffffffc02007d6:	6100                	ld	s0,0(a0)
 static int free_in_list(slab_page_t **list_head, kmem_cache_t *cache, void *ptr) {
 ffffffffc02007d8:	e406                	sd	ra,8(sp)
     for (slab_page_t *sp = *list_head, *prev = NULL; sp != NULL; prev = sp, sp = sp->next) {
 ffffffffc02007da:	c821                	beqz	s0,ffffffffc020082a <free_in_list+0x58>
-        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;
-        uintptr_t end  = base + PGSIZE;
+        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;    // 页面起始虚拟地址 - Page start virtual address
+        uintptr_t end  = base + PGSIZE;                                 // 页面结束虚拟地址 - Page end virtual address
 ffffffffc02007dc:	fff406b7          	lui	a3,0xfff40
-        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;
+        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;    // 页面起始虚拟地址 - Page start virtual address
 ffffffffc02007e0:	5875                	li	a6,-3
-        uintptr_t end  = base + PGSIZE;
+        uintptr_t end  = base + PGSIZE;                                 // 页面结束虚拟地址 - Page end virtual address
 ffffffffc02007e2:	0685                	addi	a3,a3,1
 static inline ppn_t page2ppn(struct Page *page) { return page - pages + nbase; }
 ffffffffc02007e4:	0000ae17          	auipc	t3,0xa
@@ -1127,9 +1129,9 @@ ffffffffc02007f0:	1fc33303          	ld	t1,508(t1) # ffffffffc02059e8 <nbase>
 ffffffffc02007f4:	4e81                	li	t4,0
 ffffffffc02007f6:	00005897          	auipc	a7,0x5
 ffffffffc02007fa:	1fa8b883          	ld	a7,506(a7) # ffffffffc02059f0 <nbase+0x8>
-        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;
+        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;    // 页面起始虚拟地址 - Page start virtual address
 ffffffffc02007fe:	087a                	slli	a6,a6,0x1e
-        uintptr_t end  = base + PGSIZE;
+        uintptr_t end  = base + PGSIZE;                                 // 页面结束虚拟地址 - Page end virtual address
 ffffffffc0200800:	06b2                	slli	a3,a3,0xc
 ffffffffc0200802:	a011                	j	ffffffffc0200806 <free_in_list+0x34>
 ffffffffc0200804:	843e                	mv	s0,a5
@@ -1140,10 +1142,12 @@ ffffffffc020080e:	031787b3          	mul	a5,a5,a7
 ffffffffc0200812:	979a                	add	a5,a5,t1
     return page2ppn(page) << PGSHIFT;
 ffffffffc0200814:	07b2                	slli	a5,a5,0xc
-        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;
+        uintptr_t base = page2pa(sp->page) + PHYSICAL_MEMORY_OFFSET;    // 页面起始虚拟地址 - Page start virtual address
 ffffffffc0200816:	01078733          	add	a4,a5,a6
-        uintptr_t end  = base + PGSIZE;
+        uintptr_t end  = base + PGSIZE;                                 // 页面结束虚拟地址 - Page end virtual address
 ffffffffc020081a:	97b6                	add	a5,a5,a3
+        
+        // 检查地址是否在此页面范围内 - Check if address is within this page range
         if ((uintptr_t)ptr >= base && (uintptr_t)ptr < end) {
 ffffffffc020081c:	00e66463          	bltu	a2,a4,ffffffffc0200824 <free_in_list+0x52>
 ffffffffc0200820:	00f66a63          	bltu	a2,a5,ffffffffc0200834 <free_in_list+0x62>
@@ -1152,29 +1156,29 @@ ffffffffc0200824:	6c1c                	ld	a5,24(s0)
 ffffffffc0200826:	8ea2                	mv	t4,s0
 ffffffffc0200828:	fff1                	bnez	a5,ffffffffc0200804 <free_in_list+0x32>
             }
-            return 1;
+            return 1;  // 成功释放 - Successfully freed
         }
     }
-    return 0;
+    return 0;  // 未找到 - Not found
 }
 ffffffffc020082a:	60a2                	ld	ra,8(sp)
 ffffffffc020082c:	6402                	ld	s0,0(sp)
-    return 0;
+    return 0;  // 未找到 - Not found
 ffffffffc020082e:	4501                	li	a0,0
 }
 ffffffffc0200830:	0141                	addi	sp,sp,16
 ffffffffc0200832:	8082                	ret
-            *(void **)ptr = sp->free_head;
+            *(void **)ptr = sp->free_head;              // 在对象开头存储原链表头 - Store original list head at object start
 ffffffffc0200834:	6414                	ld	a3,8(s0)
-            if (sp->inuse > 0) sp->inuse--;
+            if (sp->inuse > 0) sp->inuse--;             // 减少使用计数 - Decrease usage count
 ffffffffc0200836:	481c                	lw	a5,16(s0)
             if (list_head == &cache->full && sp->inuse < sp->capacity) {
 ffffffffc0200838:	01058713          	addi	a4,a1,16
-            *(void **)ptr = sp->free_head;
+            *(void **)ptr = sp->free_head;              // 在对象开头存储原链表头 - Store original list head at object start
 ffffffffc020083c:	e214                	sd	a3,0(a2)
-            sp->free_head = ptr;
+            sp->free_head = ptr;                        // 更新链表头为当前对象 - Update list head to current object
 ffffffffc020083e:	e410                	sd	a2,8(s0)
-            if (sp->inuse > 0) sp->inuse--;
+            if (sp->inuse > 0) sp->inuse--;             // 减少使用计数 - Decrease usage count
 ffffffffc0200840:	cb99                	beqz	a5,ffffffffc0200856 <free_in_list+0x84>
 ffffffffc0200842:	37fd                	addiw	a5,a5,-1
 ffffffffc0200844:	c81c                	sw	a5,16(s0)
@@ -1182,7 +1186,7 @@ ffffffffc0200844:	c81c                	sw	a5,16(s0)
 ffffffffc0200846:	04e50463          	beq	a0,a4,ffffffffc020088e <free_in_list+0xbc>
             if (sp->inuse == 0 && sp->capacity > 0) {
 ffffffffc020084a:	cb81                	beqz	a5,ffffffffc020085a <free_in_list+0x88>
-            return 1;
+            return 1;  // 成功释放 - Successfully freed
 ffffffffc020084c:	4505                	li	a0,1
 }
 ffffffffc020084e:	60a2                	ld	ra,8(sp)
@@ -1198,30 +1202,30 @@ ffffffffc020085e:	d77d                	beqz	a4,ffffffffc020084c <free_in_list+0x
                 if (list_head == &cache->partial) {
 ffffffffc0200860:	05a1                	addi	a1,a1,8
 ffffffffc0200862:	04b50963          	beq	a0,a1,ffffffffc02008b4 <free_in_list+0xe2>
-                free_page(sp->page);
+                free_page(sp->page);                    // 释放物理页面 - Free physical page
 ffffffffc0200866:	6008                	ld	a0,0(s0)
 ffffffffc0200868:	4585                	li	a1,1
 ffffffffc020086a:	d73ff0ef          	jal	ra,ffffffffc02005dc <free_pages>
-    sp->next = (slab_page_t *)(uintptr_t)sp_freelist_head;
+    sp->next = (slab_page_t *)(uintptr_t)sp_freelist_head;  // 链接到空闲链表 - Link to free list
 ffffffffc020086e:	00007717          	auipc	a4,0x7
 ffffffffc0200872:	7a270713          	addi	a4,a4,1954 # ffffffffc0208010 <sp_freelist_head>
 ffffffffc0200876:	4314                	lw	a3,0(a4)
-    int idx = (int)(sp - sp_pool);
+    int idx = (int)(sp - sp_pool);                  // 计算描述符在池中的索引 - Calculate descriptor index in pool
 ffffffffc0200878:	00008797          	auipc	a5,0x8
 ffffffffc020087c:	86878793          	addi	a5,a5,-1944 # ffffffffc02080e0 <sp_pool>
 ffffffffc0200880:	40f407b3          	sub	a5,s0,a5
 ffffffffc0200884:	8795                	srai	a5,a5,0x5
-    sp->next = (slab_page_t *)(uintptr_t)sp_freelist_head;
+    sp->next = (slab_page_t *)(uintptr_t)sp_freelist_head;  // 链接到空闲链表 - Link to free list
 ffffffffc0200886:	ec14                	sd	a3,24(s0)
-    int idx = (int)(sp - sp_pool);
+    int idx = (int)(sp - sp_pool);                  // 计算描述符在池中的索引 - Calculate descriptor index in pool
 ffffffffc0200888:	c31c                	sw	a5,0(a4)
-            return 1;
+            return 1;  // 成功释放 - Successfully freed
 ffffffffc020088a:	4505                	li	a0,1
 ffffffffc020088c:	b7c9                	j	ffffffffc020084e <free_in_list+0x7c>
             if (list_head == &cache->full && sp->inuse < sp->capacity) {
 ffffffffc020088e:	4858                	lw	a4,20(s0)
 ffffffffc0200890:	fae7fde3          	bgeu	a5,a4,ffffffffc020084a <free_in_list+0x78>
-                if (prev) prev->next = sp->next; else *list_head = sp->next;
+                if (prev) prev->next = sp->next; 
 ffffffffc0200894:	6c18                	ld	a4,24(s0)
 ffffffffc0200896:	020e8563          	beqz	t4,ffffffffc02008c0 <free_in_list+0xee>
 ffffffffc020089a:	00eebc23          	sd	a4,24(t4)
@@ -1232,7 +1236,7 @@ ffffffffc02008a0:	ec18                	sd	a4,24(s0)
 ffffffffc02008a2:	e580                	sd	s0,8(a1)
             if (sp->inuse == 0 && sp->capacity > 0) {
 ffffffffc02008a4:	dfd5                	beqz	a5,ffffffffc0200860 <free_in_list+0x8e>
-            return 1;
+            return 1;  // 成功释放 - Successfully freed
 ffffffffc02008a6:	4505                	li	a0,1
 ffffffffc02008a8:	b75d                	j	ffffffffc020084e <free_in_list+0x7c>
             if (list_head == &cache->full && sp->inuse < sp->capacity) {
@@ -1240,15 +1244,15 @@ ffffffffc02008aa:	4858                	lw	a4,20(s0)
 ffffffffc02008ac:	0007069b          	sext.w	a3,a4
 ffffffffc02008b0:	f2f5                	bnez	a3,ffffffffc0200894 <free_in_list+0xc2>
 ffffffffc02008b2:	b76d                	j	ffffffffc020085c <free_in_list+0x8a>
-                    if (prev) prev->next = sp->next; else *list_head = sp->next;
+                    if (prev) prev->next = sp->next; 
 ffffffffc02008b4:	6c1c                	ld	a5,24(s0)
 ffffffffc02008b6:	000e8763          	beqz	t4,ffffffffc02008c4 <free_in_list+0xf2>
 ffffffffc02008ba:	00febc23          	sd	a5,24(t4)
 ffffffffc02008be:	b765                	j	ffffffffc0200866 <free_in_list+0x94>
-                if (prev) prev->next = sp->next; else *list_head = sp->next;
+                else *list_head = sp->next;
 ffffffffc02008c0:	e118                	sd	a4,0(a0)
 ffffffffc02008c2:	bff1                	j	ffffffffc020089e <free_in_list+0xcc>
-                    if (prev) prev->next = sp->next; else *list_head = sp->next;
+                    else *list_head = sp->next;
 ffffffffc02008c4:	e11c                	sd	a5,0(a0)
 ffffffffc02008c6:	b745                	j	ffffffffc0200866 <free_in_list+0x94>
 
@@ -1280,12 +1284,12 @@ ffffffffc0200902:	00007617          	auipc	a2,0x7
 ffffffffc0200906:	7de60613          	addi	a2,a2,2014 # ffffffffc02080e0 <sp_pool>
 ffffffffc020090a:	46c1                	li	a3,16
 ffffffffc020090c:	a011                	j	ffffffffc0200910 <slub_init+0x48>
-        caches[i].object_size = class_sizes[i];
+        caches[i].object_size = class_sizes[i];     // 设置对象大小 - Set object size
 ffffffffc020090e:	6314                	ld	a3,0(a4)
 ffffffffc0200910:	e394                	sd	a3,0(a5)
-        caches[i].partial = NULL;
+        caches[i].partial = NULL;                   // 初始时无部分空闲页面 - Initially no partial pages
 ffffffffc0200912:	0007b423          	sd	zero,8(a5)
-        caches[i].full = NULL;
+        caches[i].full = NULL;                      // 初始时无全满页面 - Initially no full pages
 ffffffffc0200916:	0007b823          	sd	zero,16(a5)
     for (int i = 0; i < SLUB_NUM_CLASSES; i++) {
 ffffffffc020091a:	07e1                	addi	a5,a5,24
@@ -1372,7 +1376,7 @@ ffffffffc02009ae:	e414                	sd	a3,8(s0)
 ffffffffc02009b0:	ef98                	sd	a4,24(a5)
         cache->full = sp;
 ffffffffc02009b2:	e81c                	sd	a5,16(s0)
-        return kmalloc(size);
+        return kmalloc(size);  // 递归重试 - Recursive retry
 ffffffffc02009b4:	bf75                	j	ffffffffc0200970 <kmalloc+0x4c>
     struct Page *pg = alloc_page();
 ffffffffc02009b6:	4505                	li	a0,1
@@ -1387,14 +1391,14 @@ ffffffffc02009ca:	000ab803          	ld	a6,0(s5)
 ffffffffc02009ce:	40f507b3          	sub	a5,a0,a5
 ffffffffc02009d2:	878d                	srai	a5,a5,0x3
 ffffffffc02009d4:	034787b3          	mul	a5,a5,s4
-    size_t objs = PGSIZE / obj_size;
+    size_t objs = PGSIZE / obj_size;                // 计算页面可容纳的对象数 - Calculate objects per page
 ffffffffc02009d8:	6705                	lui	a4,0x1
 ffffffffc02009da:	97b6                	add	a5,a5,a3
     return page2ppn(page) << PGSHIFT;
 ffffffffc02009dc:	07b2                	slli	a5,a5,0xc
     void *mem = (void *)(page2pa(pg) + PHYSICAL_MEMORY_OFFSET);
 ffffffffc02009de:	97ce                	add	a5,a5,s3
-    size_t objs = PGSIZE / obj_size;
+    size_t objs = PGSIZE / obj_size;                // 计算页面可容纳的对象数 - Calculate objects per page
 ffffffffc02009e0:	030755b3          	divu	a1,a4,a6
     void *mem = (void *)(page2pa(pg) + PHYSICAL_MEMORY_OFFSET);
 ffffffffc02009e4:	88be                	mv	a7,a5
@@ -1404,11 +1408,11 @@ ffffffffc02009e6:	11076263          	bltu	a4,a6,ffffffffc0200aea <kmalloc+0x1c6>
 ffffffffc02009ea:	4701                	li	a4,0
     for (size_t i = 0; i < objs; i++) {
 ffffffffc02009ec:	4681                	li	a3,0
-        *slot = head;
+        *slot = head;                               // 在对象开头存储下一个空闲对象指针 - Store next free object pointer at object start
 ffffffffc02009ee:	e398                	sd	a4,0(a5)
     for (size_t i = 0; i < objs; i++) {
 ffffffffc02009f0:	0685                	addi	a3,a3,1
-        void **slot = (void **)((char *)mem + i * obj_size);
+        void **slot = (void **)((char *)mem + i * obj_size);    // 当前对象位置 - Current object location
 ffffffffc02009f2:	873e                	mv	a4,a5
     for (size_t i = 0; i < objs; i++) {
 ffffffffc02009f4:	97c2                	add	a5,a5,a6
@@ -1417,55 +1421,55 @@ ffffffffc02009fa:	6705                	lui	a4,0x1
 ffffffffc02009fc:	4781                	li	a5,0
 ffffffffc02009fe:	01076463          	bltu	a4,a6,ffffffffc0200a06 <kmalloc+0xe2>
 ffffffffc0200a02:	fff58793          	addi	a5,a1,-1
-    if (sp_freelist_head < 0) return NULL;
+    if (sp_freelist_head < 0) return NULL;          // 池已空 - Pool is empty
 ffffffffc0200a06:	00007517          	auipc	a0,0x7
 ffffffffc0200a0a:	60a50513          	addi	a0,a0,1546 # ffffffffc0208010 <sp_freelist_head>
 ffffffffc0200a0e:	03078733          	mul	a4,a5,a6
 ffffffffc0200a12:	411c                	lw	a5,0(a0)
 ffffffffc0200a14:	98ba                	add	a7,a7,a4
 ffffffffc0200a16:	0c07c463          	bltz	a5,ffffffffc0200ade <kmalloc+0x1ba>
-    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;
+    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;  // 更新链表头 - Update list head
 ffffffffc0200a1a:	00007697          	auipc	a3,0x7
 ffffffffc0200a1e:	6c668693          	addi	a3,a3,1734 # ffffffffc02080e0 <sp_pool>
 ffffffffc0200a22:	0796                	slli	a5,a5,0x5
 ffffffffc0200a24:	97b6                	add	a5,a5,a3
-    sp->next = cache->partial;
+    sp->next = cache->partial;                     // 插入到部分空闲链表 - Insert into partial list
 ffffffffc0200a26:	00848733          	add	a4,s1,s0
-    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;
+    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;  // 更新链表头 - Update list head
 ffffffffc0200a2a:	0187b803          	ld	a6,24(a5)
-    sp->next = cache->partial;
+    sp->next = cache->partial;                     // 插入到部分空闲链表 - Insert into partial list
 ffffffffc0200a2e:	070e                	slli	a4,a4,0x3
 ffffffffc0200a30:	9762                	add	a4,a4,s8
 ffffffffc0200a32:	6714                	ld	a3,8(a4)
-    sp->free_head = head;
+    sp->free_head = head;                          // 设置空闲链表头 - Set free list head
 ffffffffc0200a34:	0117b423          	sd	a7,8(a5)
-    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;
+    sp_freelist_head = (int)(uintptr_t)sp_pool[idx].next;  // 更新链表头 - Update list head
 ffffffffc0200a38:	01052023          	sw	a6,0(a0)
     void *obj = sp->free_head;
 ffffffffc0200a3c:	6788                	ld	a0,8(a5)
-    sp->page = pg;
+    sp->page = pg;                                  // 关联物理页面 - Associate physical page
 ffffffffc0200a3e:	e390                	sd	a2,0(a5)
-    sp->inuse = 0;
+    sp->inuse = 0;                                 // 初始时无对象被使用 - Initially no objects in use
 ffffffffc0200a40:	0007a823          	sw	zero,16(a5)
-    sp->capacity = (unsigned int)objs;
+    sp->capacity = (unsigned int)objs;             // 设置容量 - Set capacity
 ffffffffc0200a44:	cbcc                	sw	a1,20(a5)
-    sp->next = cache->partial;
+    sp->next = cache->partial;                     // 插入到部分空闲链表 - Insert into partial list
 ffffffffc0200a46:	ef94                	sd	a3,24(a5)
     cache->partial = sp;
 ffffffffc0200a48:	e71c                	sd	a5,8(a4)
     if (obj == NULL) {
 ffffffffc0200a4a:	dd29                	beqz	a0,ffffffffc02009a4 <kmalloc+0x80>
-    sp->inuse++;
+    sp->inuse++;                                // 增加使用计数 - Increment usage count
 ffffffffc0200a4c:	4b98                	lw	a4,16(a5)
-    sp->free_head = *(void **)obj;
+    sp->free_head = *(void **)obj;              // 更新空闲链表头 - Update free list head
 ffffffffc0200a4e:	6114                	ld	a3,0(a0)
     if (sp->inuse == sp->capacity) {
 ffffffffc0200a50:	4bd0                	lw	a2,20(a5)
-    sp->inuse++;
+    sp->inuse++;                                // 增加使用计数 - Increment usage count
 ffffffffc0200a52:	2705                	addiw	a4,a4,1
-    sp->free_head = *(void **)obj;
+    sp->free_head = *(void **)obj;              // 更新空闲链表头 - Update free list head
 ffffffffc0200a54:	e794                	sd	a3,8(a5)
-    sp->inuse++;
+    sp->inuse++;                                // 增加使用计数 - Increment usage count
 ffffffffc0200a56:	cb98                	sw	a4,16(a5)
 ffffffffc0200a58:	0007069b          	sext.w	a3,a4
     if (sp->inuse == sp->capacity) {
@@ -1486,7 +1490,7 @@ ffffffffc0200a70:	eb1c                	sd	a5,16(a4)
 ffffffffc0200a72:	a881                	j	ffffffffc0200ac2 <kmalloc+0x19e>
     return (x + a - 1) & ~(a - 1);
 ffffffffc0200a74:	6405                	lui	s0,0x1
-ffffffffc0200a76:	147d                	addi	s0,s0,-1
+ffffffffc0200a76:	043d                	addi	s0,s0,15
 ffffffffc0200a78:	944a                	add	s0,s0,s2
         size_t pages_need = bytes / PGSIZE;
 ffffffffc0200a7a:	8031                	srli	s0,s0,0xc
@@ -1512,14 +1516,14 @@ ffffffffc0200aaa:	077a                	slli	a4,a4,0x1e
     return page2ppn(page) << PGSHIFT;
 ffffffffc0200aac:	07b2                	slli	a5,a5,0xc
 ffffffffc0200aae:	97ba                	add	a5,a5,a4
-        hdr->magic = LARGE_MAGIC;
+        hdr->magic = LARGE_MAGIC;               // 设置魔数 - Set magic number
 ffffffffc0200ab0:	4c524737          	lui	a4,0x4c524
 ffffffffc0200ab4:	74c70713          	addi	a4,a4,1868 # 4c52474c <kern_entry-0xffffffff73cdb8b4>
-        hdr->page = pg;
+        hdr->page = pg;                         // 记录起始页面 - Record starting page
 ffffffffc0200ab8:	e788                	sd	a0,8(a5)
-        hdr->magic = LARGE_MAGIC;
+        hdr->magic = LARGE_MAGIC;               // 设置魔数 - Set magic number
 ffffffffc0200aba:	c398                	sw	a4,0(a5)
-        hdr->pages = (uint32_t)pages_need;
+        hdr->pages = (uint32_t)pages_need;      // 记录页面数 - Record page count
 ffffffffc0200abc:	c3c0                	sw	s0,4(a5)
         return (void *)((char *)kva + sizeof(large_hdr_t));
 ffffffffc0200abe:	01078513          	addi	a0,a5,16
@@ -1553,9 +1557,12 @@ ffffffffc0200af0:	4501                	li	a0,0
 ffffffffc0200af2:	bfc1                	j	ffffffffc0200ac2 <kmalloc+0x19e>
 
 ffffffffc0200af4 <kfree>:
-
+ * - 如果不在SLAB中，尝试作为大对象释放
+ * 
+ * @param ptr 要释放的内存指针，允许为NULL
+ */
 void kfree(void *ptr) {
-    if (ptr == NULL) return;
+    if (ptr == NULL) return;  // 允许释放NULL指针 - Allow freeing NULL pointer
 ffffffffc0200af4:	cd2d                	beqz	a0,ffffffffc0200b6e <kfree+0x7a>
 void kfree(void *ptr) {
 ffffffffc0200af6:	1101                	addi	sp,sp,-32
@@ -1568,13 +1575,18 @@ ffffffffc0200b02:	00007417          	auipc	s0,0x7
 ffffffffc0200b06:	51e40413          	addi	s0,s0,1310 # ffffffffc0208020 <caches>
 ffffffffc0200b0a:	00007917          	auipc	s2,0x7
 ffffffffc0200b0e:	5d690913          	addi	s2,s2,1494 # ffffffffc02080e0 <sp_pool>
+    
+    // 尝试在所有SLAB缓存中释放 - Try to free in all SLAB caches
     for (int i = 0; i < SLUB_NUM_CLASSES; i++) {
+        // 先尝试部分空闲链表 - Try partial list first
         if (free_in_list(&caches[i].partial, &caches[i], ptr)) return;
 ffffffffc0200b12:	85a2                	mv	a1,s0
 ffffffffc0200b14:	8626                	mv	a2,s1
 ffffffffc0200b16:	00840513          	addi	a0,s0,8
 ffffffffc0200b1a:	cb9ff0ef          	jal	ra,ffffffffc02007d2 <free_in_list>
 ffffffffc0200b1e:	87aa                	mv	a5,a0
+        
+        // 再尝试全满链表 - Then try full list
         if (free_in_list(&caches[i].full, &caches[i], ptr)) return;
 ffffffffc0200b20:	85a2                	mv	a1,s0
 ffffffffc0200b22:	01040513          	addi	a0,s0,16
@@ -1588,15 +1600,20 @@ ffffffffc0200b2c:	ca7ff0ef          	jal	ra,ffffffffc02007d2 <free_in_list>
 ffffffffc0200b30:	e919                	bnez	a0,ffffffffc0200b46 <kfree+0x52>
     for (int i = 0; i < SLUB_NUM_CLASSES; i++) {
 ffffffffc0200b32:	fe8910e3          	bne	s2,s0,ffffffffc0200b12 <kfree+0x1e>
-    }
+    
+    // 如果不在SLAB中，尝试作为大对象释放 - If not in SLAB, try to free as large object
     large_hdr_t *hdr = (large_hdr_t *)((char *)ptr - sizeof(large_hdr_t));
+    
+    // 验证大对象头部的有效性 - Validate large object header
     if (hdr->magic == LARGE_MAGIC && hdr->page != NULL && hdr->pages > 0) {
 ffffffffc0200b36:	ff04a703          	lw	a4,-16(s1)
 ffffffffc0200b3a:	4c5247b7          	lui	a5,0x4c524
 ffffffffc0200b3e:	74c78793          	addi	a5,a5,1868 # 4c52474c <kern_entry-0xffffffff73cdb8b4>
 ffffffffc0200b42:	00f70863          	beq	a4,a5,ffffffffc0200b52 <kfree+0x5e>
-        free_pages(hdr->page, hdr->pages);
+        free_pages(hdr->page, hdr->pages);      // 释放页面 - Free pages
     }
+    // 注意：如果既不是SLAB对象也不是有效的大对象，则可能是无效指针，此处选择静默忽略
+    // Note: If neither SLAB object nor valid large object, might be invalid pointer, silently ignore here
 }
 ffffffffc0200b46:	60e2                	ld	ra,24(sp)
 ffffffffc0200b48:	6442                	ld	s0,16(sp)
@@ -1614,48 +1631,60 @@ ffffffffc0200b5e:	6442                	ld	s0,16(sp)
 ffffffffc0200b60:	60e2                	ld	ra,24(sp)
 ffffffffc0200b62:	64a2                	ld	s1,8(sp)
 ffffffffc0200b64:	6902                	ld	s2,0(sp)
-        free_pages(hdr->page, hdr->pages);
+        free_pages(hdr->page, hdr->pages);      // 释放页面 - Free pages
 ffffffffc0200b66:	1582                	slli	a1,a1,0x20
 ffffffffc0200b68:	9181                	srli	a1,a1,0x20
 }
 ffffffffc0200b6a:	6105                	addi	sp,sp,32
-        free_pages(hdr->page, hdr->pages);
+        free_pages(hdr->page, hdr->pages);      // 释放页面 - Free pages
 ffffffffc0200b6c:	bc85                	j	ffffffffc02005dc <free_pages>
 ffffffffc0200b6e:	8082                	ret
 
 ffffffffc0200b70 <slub_check>:
-
+ * @brief SLUB分配器自检 - SLUB allocator self-check
+ * 
+ * 执行基本的分配和释放测试，验证SLUB分配器的正确性。
+ * 测试包括不同大小的对象分配和释放。
+ */
 void slub_check(void) {
 ffffffffc0200b70:	1101                	addi	sp,sp,-32
-    void *a = kmalloc(24);
+    // 测试不同大小的分配 - Test allocation of different sizes
+    void *a = kmalloc(24);      // 小对象，应使用32字节类别 - Small object, should use 32-byte class
 ffffffffc0200b72:	4561                	li	a0,24
 void slub_check(void) {
 ffffffffc0200b74:	ec06                	sd	ra,24(sp)
 ffffffffc0200b76:	e822                	sd	s0,16(sp)
 ffffffffc0200b78:	e04a                	sd	s2,0(sp)
 ffffffffc0200b7a:	e426                	sd	s1,8(sp)
-    void *a = kmalloc(24);
+    void *a = kmalloc(24);      // 小对象，应使用32字节类别 - Small object, should use 32-byte class
 ffffffffc0200b7c:	da9ff0ef          	jal	ra,ffffffffc0200924 <kmalloc>
 ffffffffc0200b80:	842a                	mv	s0,a0
-    void *b = kmalloc(200);
+    void *b = kmalloc(200);     // 中等对象，应使用256字节类别 - Medium object, should use 256-byte class
 ffffffffc0200b82:	0c800513          	li	a0,200
 ffffffffc0200b86:	d9fff0ef          	jal	ra,ffffffffc0200924 <kmalloc>
 ffffffffc0200b8a:	892a                	mv	s2,a0
-    void *c = kmalloc(1024);
+    void *c = kmalloc(1024);    // 大对象，应使用1024字节类别 - Large object, should use 1024-byte class
 ffffffffc0200b8c:	40000513          	li	a0,1024
 ffffffffc0200b90:	d95ff0ef          	jal	ra,ffffffffc0200924 <kmalloc>
+    
+    // 验证分配成功 - Verify allocation success
     assert(a != NULL && b != NULL && c != NULL);
 ffffffffc0200b94:	c015                	beqz	s0,ffffffffc0200bb8 <slub_check+0x48>
 ffffffffc0200b96:	02090163          	beqz	s2,ffffffffc0200bb8 <slub_check+0x48>
 ffffffffc0200b9a:	84aa                	mv	s1,a0
 ffffffffc0200b9c:	cd11                	beqz	a0,ffffffffc0200bb8 <slub_check+0x48>
+    
+    // 测试释放 - Test freeing
     kfree(a);
 ffffffffc0200b9e:	8522                	mv	a0,s0
 ffffffffc0200ba0:	f55ff0ef          	jal	ra,ffffffffc0200af4 <kfree>
-    kfree(b);
+    kfree(b); 
 ffffffffc0200ba4:	854a                	mv	a0,s2
 ffffffffc0200ba6:	f4fff0ef          	jal	ra,ffffffffc0200af4 <kfree>
     kfree(c);
+    
+    // 注意：这是一个基础测试，实际使用中可能需要更全面的测试
+    // Note: This is a basic test, actual usage might need more comprehensive testing
 }
 ffffffffc0200baa:	6442                	ld	s0,16(sp)
 ffffffffc0200bac:	60e2                	ld	ra,24(sp)
@@ -1672,7 +1701,7 @@ ffffffffc0200bb8:	00004697          	auipc	a3,0x4
 ffffffffc0200bbc:	7f068693          	addi	a3,a3,2032 # ffffffffc02053a8 <boot_page_table_sv39+0x13a8>
 ffffffffc0200bc0:	00005617          	auipc	a2,0x5
 ffffffffc0200bc4:	81060613          	addi	a2,a2,-2032 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200bc8:	0c400593          	li	a1,196
+ffffffffc0200bc8:	18c00593          	li	a1,396
 ffffffffc0200bcc:	00005517          	auipc	a0,0x5
 ffffffffc0200bd0:	81c50513          	addi	a0,a0,-2020 # ffffffffc02053e8 <boot_page_table_sv39+0x13e8>
 ffffffffc0200bd4:	deeff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -1688,19 +1717,19 @@ ffffffffc0200bd8:	00009797          	auipc	a5,0x9
 ffffffffc0200bdc:	50878793          	addi	a5,a5,1288 # ffffffffc020a0e0 <free_area>
 ffffffffc0200be0:	e79c                	sd	a5,8(a5)
 ffffffffc0200be2:	e39c                	sd	a5,0(a5)
-#define nr_free (free_area.nr_free)
-
+ * Initialize the free list and reset free page counter to zero.
+ */
 static void
 best_fit_init(void) {
-    list_init(&free_list);
-    nr_free = 0;
+    list_init(&free_list);              // 初始化空闲链表 - Initialize free list
+    nr_free = 0;                        // 清零空闲页数 - Reset free page count
 ffffffffc0200be4:	0007a823          	sw	zero,16(a5)
 }
 ffffffffc0200be8:	8082                	ret
 
 ffffffffc0200bea <best_fit_nr_free_pages>:
-}
-
+ * @return 当前空闲页面的总数
+ */
 static size_t
 best_fit_nr_free_pages(void) {
     return nr_free;
@@ -1727,11 +1756,11 @@ static inline list_entry_t *
 list_next(list_entry_t *listelm) {
     return listelm->next;
 ffffffffc0200c0e:	661c                	ld	a5,8(a2)
-    size_t min_size = nr_free + 1;
+    size_t min_size = nr_free + 1;      // 初始化为不可能的大小 - Initialize to impossible size
 ffffffffc0200c10:	0018059b          	addiw	a1,a6,1
 ffffffffc0200c14:	1582                	slli	a1,a1,0x20
 ffffffffc0200c16:	9181                	srli	a1,a1,0x20
-    struct Page *page = NULL;
+    struct Page *page = NULL;           // 最佳匹配的页面 - Best matched page
 ffffffffc0200c18:	4501                	li	a0,0
     while ((le = list_next(le)) != &free_list) {
 ffffffffc0200c1a:	06c78763          	beq	a5,a2,ffffffffc0200c88 <best_fit_alloc_pages+0x94>
@@ -1769,24 +1798,24 @@ __list_del(list_entry_t *prev, list_entry_t *next) {
 ffffffffc0200c46:	e70c                	sd	a1,8(a4)
     next->prev = prev;
 ffffffffc0200c48:	e198                	sd	a4,0(a1)
-            p->property = page->property - n;
+            p->property = page->property - n;   // 设置剩余部分的大小 - Set size of remaining part
 ffffffffc0200c4a:	0006831b          	sext.w	t1,a3
         if (page->property > n) {
 ffffffffc0200c4e:	02f6f563          	bgeu	a3,a5,ffffffffc0200c78 <best_fit_alloc_pages+0x84>
-            struct Page *p = page + n;
+            struct Page *p = page + n;          // 剩余部分的起始页面 - Start of remaining part
 ffffffffc0200c52:	00269793          	slli	a5,a3,0x2
 ffffffffc0200c56:	97b6                	add	a5,a5,a3
 ffffffffc0200c58:	078e                	slli	a5,a5,0x3
 ffffffffc0200c5a:	97aa                	add	a5,a5,a0
-            SetPageProperty(p);
+            SetPageProperty(p);                 // 设置剩余部分为空闲块头 - Mark remaining part as free block head
 ffffffffc0200c5c:	6794                	ld	a3,8(a5)
-            p->property = page->property - n;
+            p->property = page->property - n;   // 设置剩余部分的大小 - Set size of remaining part
 ffffffffc0200c5e:	406888bb          	subw	a7,a7,t1
 ffffffffc0200c62:	0117a823          	sw	a7,16(a5)
-            SetPageProperty(p);
+            SetPageProperty(p);                 // 设置剩余部分为空闲块头 - Mark remaining part as free block head
 ffffffffc0200c66:	0026e693          	ori	a3,a3,2
 ffffffffc0200c6a:	e794                	sd	a3,8(a5)
-            list_add(prev, &(p->page_link));
+            list_add(prev, &(p->page_link));    // 将剩余部分插入空闲链表 - Insert remaining part into free list
 ffffffffc0200c6c:	01878693          	addi	a3,a5,24
     prev->next = next->prev = elm;
 ffffffffc0200c70:	e194                	sd	a3,0(a1)
@@ -1795,12 +1824,12 @@ ffffffffc0200c72:	e714                	sd	a3,8(a4)
 ffffffffc0200c74:	f38c                	sd	a1,32(a5)
     elm->prev = prev;
 ffffffffc0200c76:	ef98                	sd	a4,24(a5)
-        ClearPageProperty(page);
+        ClearPageProperty(page);                // 清除分配页面的属性标志 - Clear property flag of allocated pages
 ffffffffc0200c78:	651c                	ld	a5,8(a0)
-        nr_free -= n;
+        nr_free -= n;                           // 减少空闲页计数 - Decrease free page count
 ffffffffc0200c7a:	4068083b          	subw	a6,a6,t1
 ffffffffc0200c7e:	01062823          	sw	a6,16(a2)
-        ClearPageProperty(page);
+        ClearPageProperty(page);                // 清除分配页面的属性标志 - Clear property flag of allocated pages
 ffffffffc0200c82:	9bf5                	andi	a5,a5,-3
 ffffffffc0200c84:	e51c                	sd	a5,8(a0)
 ffffffffc0200c86:	8082                	ret
@@ -1816,7 +1845,7 @@ ffffffffc0200c90:	00004697          	auipc	a3,0x4
 ffffffffc0200c94:	7a868693          	addi	a3,a3,1960 # ffffffffc0205438 <class_sizes+0x40>
 ffffffffc0200c98:	00004617          	auipc	a2,0x4
 ffffffffc0200c9c:	73860613          	addi	a2,a2,1848 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200ca0:	06400593          	li	a1,100
+ffffffffc0200ca0:	08300593          	li	a1,131
 ffffffffc0200ca4:	00004517          	auipc	a0,0x4
 ffffffffc0200ca8:	79c50513          	addi	a0,a0,1948 # ffffffffc0205440 <class_sizes+0x48>
 best_fit_alloc_pages(size_t n) {
@@ -2180,7 +2209,7 @@ ffffffffc0200f4c:	00004697          	auipc	a3,0x4
 ffffffffc0200f50:	50c68693          	addi	a3,a3,1292 # ffffffffc0205458 <class_sizes+0x60>
 ffffffffc0200f54:	00004617          	auipc	a2,0x4
 ffffffffc0200f58:	47c60613          	addi	a2,a2,1148 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200f5c:	0f400593          	li	a1,244
+ffffffffc0200f5c:	13900593          	li	a1,313
 ffffffffc0200f60:	00004517          	auipc	a0,0x4
 ffffffffc0200f64:	4e050513          	addi	a0,a0,1248 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0200f68:	a5aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2189,7 +2218,7 @@ ffffffffc0200f6c:	00004697          	auipc	a3,0x4
 ffffffffc0200f70:	57c68693          	addi	a3,a3,1404 # ffffffffc02054e8 <class_sizes+0xf0>
 ffffffffc0200f74:	00004617          	auipc	a2,0x4
 ffffffffc0200f78:	45c60613          	addi	a2,a2,1116 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200f7c:	0c000593          	li	a1,192
+ffffffffc0200f7c:	10500593          	li	a1,261
 ffffffffc0200f80:	00004517          	auipc	a0,0x4
 ffffffffc0200f84:	4c050513          	addi	a0,a0,1216 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0200f88:	a3aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2198,7 +2227,7 @@ ffffffffc0200f8c:	00004697          	auipc	a3,0x4
 ffffffffc0200f90:	58468693          	addi	a3,a3,1412 # ffffffffc0205510 <class_sizes+0x118>
 ffffffffc0200f94:	00004617          	auipc	a2,0x4
 ffffffffc0200f98:	43c60613          	addi	a2,a2,1084 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200f9c:	0c100593          	li	a1,193
+ffffffffc0200f9c:	10600593          	li	a1,262
 ffffffffc0200fa0:	00004517          	auipc	a0,0x4
 ffffffffc0200fa4:	4a050513          	addi	a0,a0,1184 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0200fa8:	a1aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2207,7 +2236,7 @@ ffffffffc0200fac:	00004697          	auipc	a3,0x4
 ffffffffc0200fb0:	5a468693          	addi	a3,a3,1444 # ffffffffc0205550 <class_sizes+0x158>
 ffffffffc0200fb4:	00004617          	auipc	a2,0x4
 ffffffffc0200fb8:	41c60613          	addi	a2,a2,1052 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200fbc:	0c300593          	li	a1,195
+ffffffffc0200fbc:	10800593          	li	a1,264
 ffffffffc0200fc0:	00004517          	auipc	a0,0x4
 ffffffffc0200fc4:	48050513          	addi	a0,a0,1152 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0200fc8:	9faff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2216,7 +2245,7 @@ ffffffffc0200fcc:	00004697          	auipc	a3,0x4
 ffffffffc0200fd0:	60c68693          	addi	a3,a3,1548 # ffffffffc02055d8 <class_sizes+0x1e0>
 ffffffffc0200fd4:	00004617          	auipc	a2,0x4
 ffffffffc0200fd8:	3fc60613          	addi	a2,a2,1020 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200fdc:	0dc00593          	li	a1,220
+ffffffffc0200fdc:	12100593          	li	a1,289
 ffffffffc0200fe0:	00004517          	auipc	a0,0x4
 ffffffffc0200fe4:	46050513          	addi	a0,a0,1120 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0200fe8:	9daff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2225,7 +2254,7 @@ ffffffffc0200fec:	00004697          	auipc	a3,0x4
 ffffffffc0200ff0:	4dc68693          	addi	a3,a3,1244 # ffffffffc02054c8 <class_sizes+0xd0>
 ffffffffc0200ff4:	00004617          	auipc	a2,0x4
 ffffffffc0200ff8:	3dc60613          	addi	a2,a2,988 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc0200ffc:	0be00593          	li	a1,190
+ffffffffc0200ffc:	10300593          	li	a1,259
 ffffffffc0201000:	00004517          	auipc	a0,0x4
 ffffffffc0201004:	44050513          	addi	a0,a0,1088 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201008:	9baff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2234,7 +2263,7 @@ ffffffffc020100c:	00004697          	auipc	a3,0x4
 ffffffffc0201010:	6fc68693          	addi	a3,a3,1788 # ffffffffc0205708 <class_sizes+0x310>
 ffffffffc0201014:	00004617          	auipc	a2,0x4
 ffffffffc0201018:	3bc60613          	addi	a2,a2,956 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020101c:	13600593          	li	a1,310
+ffffffffc020101c:	17b00593          	li	a1,379
 ffffffffc0201020:	00004517          	auipc	a0,0x4
 ffffffffc0201024:	42050513          	addi	a0,a0,1056 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201028:	99aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2243,7 +2272,7 @@ ffffffffc020102c:	00004697          	auipc	a3,0x4
 ffffffffc0201030:	43c68693          	addi	a3,a3,1084 # ffffffffc0205468 <class_sizes+0x70>
 ffffffffc0201034:	00004617          	auipc	a2,0x4
 ffffffffc0201038:	39c60613          	addi	a2,a2,924 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020103c:	0f700593          	li	a1,247
+ffffffffc020103c:	13c00593          	li	a1,316
 ffffffffc0201040:	00004517          	auipc	a0,0x4
 ffffffffc0201044:	40050513          	addi	a0,a0,1024 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201048:	97aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2252,7 +2281,7 @@ ffffffffc020104c:	00004697          	auipc	a3,0x4
 ffffffffc0201050:	45c68693          	addi	a3,a3,1116 # ffffffffc02054a8 <class_sizes+0xb0>
 ffffffffc0201054:	00004617          	auipc	a2,0x4
 ffffffffc0201058:	37c60613          	addi	a2,a2,892 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020105c:	0bd00593          	li	a1,189
+ffffffffc020105c:	10200593          	li	a1,258
 ffffffffc0201060:	00004517          	auipc	a0,0x4
 ffffffffc0201064:	3e050513          	addi	a0,a0,992 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201068:	95aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2261,7 +2290,7 @@ ffffffffc020106c:	00004697          	auipc	a3,0x4
 ffffffffc0201070:	41c68693          	addi	a3,a3,1052 # ffffffffc0205488 <class_sizes+0x90>
 ffffffffc0201074:	00004617          	auipc	a2,0x4
 ffffffffc0201078:	35c60613          	addi	a2,a2,860 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020107c:	0bc00593          	li	a1,188
+ffffffffc020107c:	10100593          	li	a1,257
 ffffffffc0201080:	00004517          	auipc	a0,0x4
 ffffffffc0201084:	3c050513          	addi	a0,a0,960 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201088:	93aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2270,7 +2299,7 @@ ffffffffc020108c:	00004697          	auipc	a3,0x4
 ffffffffc0201090:	52468693          	addi	a3,a3,1316 # ffffffffc02055b0 <class_sizes+0x1b8>
 ffffffffc0201094:	00004617          	auipc	a2,0x4
 ffffffffc0201098:	33c60613          	addi	a2,a2,828 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020109c:	0d900593          	li	a1,217
+ffffffffc020109c:	11e00593          	li	a1,286
 ffffffffc02010a0:	00004517          	auipc	a0,0x4
 ffffffffc02010a4:	3a050513          	addi	a0,a0,928 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02010a8:	91aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2279,7 +2308,7 @@ ffffffffc02010ac:	00004697          	auipc	a3,0x4
 ffffffffc02010b0:	41c68693          	addi	a3,a3,1052 # ffffffffc02054c8 <class_sizes+0xd0>
 ffffffffc02010b4:	00004617          	auipc	a2,0x4
 ffffffffc02010b8:	31c60613          	addi	a2,a2,796 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02010bc:	0d700593          	li	a1,215
+ffffffffc02010bc:	11c00593          	li	a1,284
 ffffffffc02010c0:	00004517          	auipc	a0,0x4
 ffffffffc02010c4:	38050513          	addi	a0,a0,896 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02010c8:	8faff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2288,7 +2317,7 @@ ffffffffc02010cc:	00004697          	auipc	a3,0x4
 ffffffffc02010d0:	3dc68693          	addi	a3,a3,988 # ffffffffc02054a8 <class_sizes+0xb0>
 ffffffffc02010d4:	00004617          	auipc	a2,0x4
 ffffffffc02010d8:	2fc60613          	addi	a2,a2,764 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02010dc:	0d600593          	li	a1,214
+ffffffffc02010dc:	11b00593          	li	a1,283
 ffffffffc02010e0:	00004517          	auipc	a0,0x4
 ffffffffc02010e4:	36050513          	addi	a0,a0,864 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02010e8:	8daff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2297,7 +2326,7 @@ ffffffffc02010ec:	00004697          	auipc	a3,0x4
 ffffffffc02010f0:	39c68693          	addi	a3,a3,924 # ffffffffc0205488 <class_sizes+0x90>
 ffffffffc02010f4:	00004617          	auipc	a2,0x4
 ffffffffc02010f8:	2dc60613          	addi	a2,a2,732 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02010fc:	0d500593          	li	a1,213
+ffffffffc02010fc:	11a00593          	li	a1,282
 ffffffffc0201100:	00004517          	auipc	a0,0x4
 ffffffffc0201104:	34050513          	addi	a0,a0,832 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201108:	8baff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2306,7 +2335,7 @@ ffffffffc020110c:	00004697          	auipc	a3,0x4
 ffffffffc0201110:	4bc68693          	addi	a3,a3,1212 # ffffffffc02055c8 <class_sizes+0x1d0>
 ffffffffc0201114:	00004617          	auipc	a2,0x4
 ffffffffc0201118:	2bc60613          	addi	a2,a2,700 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020111c:	0d300593          	li	a1,211
+ffffffffc020111c:	11800593          	li	a1,280
 ffffffffc0201120:	00004517          	auipc	a0,0x4
 ffffffffc0201124:	32050513          	addi	a0,a0,800 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201128:	89aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2315,7 +2344,7 @@ ffffffffc020112c:	00004697          	auipc	a3,0x4
 ffffffffc0201130:	48468693          	addi	a3,a3,1156 # ffffffffc02055b0 <class_sizes+0x1b8>
 ffffffffc0201134:	00004617          	auipc	a2,0x4
 ffffffffc0201138:	29c60613          	addi	a2,a2,668 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020113c:	0ce00593          	li	a1,206
+ffffffffc020113c:	11300593          	li	a1,275
 ffffffffc0201140:	00004517          	auipc	a0,0x4
 ffffffffc0201144:	30050513          	addi	a0,a0,768 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201148:	87aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2324,7 +2353,7 @@ ffffffffc020114c:	00004697          	auipc	a3,0x4
 ffffffffc0201150:	44468693          	addi	a3,a3,1092 # ffffffffc0205590 <class_sizes+0x198>
 ffffffffc0201154:	00004617          	auipc	a2,0x4
 ffffffffc0201158:	27c60613          	addi	a2,a2,636 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020115c:	0c500593          	li	a1,197
+ffffffffc020115c:	10a00593          	li	a1,266
 ffffffffc0201160:	00004517          	auipc	a0,0x4
 ffffffffc0201164:	2e050513          	addi	a0,a0,736 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201168:	85aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2333,7 +2362,7 @@ ffffffffc020116c:	00004697          	auipc	a3,0x4
 ffffffffc0201170:	40468693          	addi	a3,a3,1028 # ffffffffc0205570 <class_sizes+0x178>
 ffffffffc0201174:	00004617          	auipc	a2,0x4
 ffffffffc0201178:	25c60613          	addi	a2,a2,604 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020117c:	0c400593          	li	a1,196
+ffffffffc020117c:	10900593          	li	a1,265
 ffffffffc0201180:	00004517          	auipc	a0,0x4
 ffffffffc0201184:	2c050513          	addi	a0,a0,704 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201188:	83aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2342,7 +2371,7 @@ ffffffffc020118c:	00004697          	auipc	a3,0x4
 ffffffffc0201190:	56c68693          	addi	a3,a3,1388 # ffffffffc02056f8 <class_sizes+0x300>
 ffffffffc0201194:	00004617          	auipc	a2,0x4
 ffffffffc0201198:	23c60613          	addi	a2,a2,572 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020119c:	13500593          	li	a1,309
+ffffffffc020119c:	17a00593          	li	a1,378
 ffffffffc02011a0:	00004517          	auipc	a0,0x4
 ffffffffc02011a4:	2a050513          	addi	a0,a0,672 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02011a8:	81aff0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2351,7 +2380,7 @@ ffffffffc02011ac:	00004697          	auipc	a3,0x4
 ffffffffc02011b0:	46468693          	addi	a3,a3,1124 # ffffffffc0205610 <class_sizes+0x218>
 ffffffffc02011b4:	00004617          	auipc	a2,0x4
 ffffffffc02011b8:	21c60613          	addi	a2,a2,540 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02011bc:	12a00593          	li	a1,298
+ffffffffc02011bc:	16f00593          	li	a1,367
 ffffffffc02011c0:	00004517          	auipc	a0,0x4
 ffffffffc02011c4:	28050513          	addi	a0,a0,640 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02011c8:	ffbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2360,7 +2389,7 @@ ffffffffc02011cc:	00004697          	auipc	a3,0x4
 ffffffffc02011d0:	3e468693          	addi	a3,a3,996 # ffffffffc02055b0 <class_sizes+0x1b8>
 ffffffffc02011d4:	00004617          	auipc	a2,0x4
 ffffffffc02011d8:	1fc60613          	addi	a2,a2,508 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02011dc:	12400593          	li	a1,292
+ffffffffc02011dc:	16900593          	li	a1,361
 ffffffffc02011e0:	00004517          	auipc	a0,0x4
 ffffffffc02011e4:	26050513          	addi	a0,a0,608 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02011e8:	fdbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2369,7 +2398,7 @@ ffffffffc02011ec:	00004697          	auipc	a3,0x4
 ffffffffc02011f0:	4ec68693          	addi	a3,a3,1260 # ffffffffc02056d8 <class_sizes+0x2e0>
 ffffffffc02011f4:	00004617          	auipc	a2,0x4
 ffffffffc02011f8:	1dc60613          	addi	a2,a2,476 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02011fc:	12300593          	li	a1,291
+ffffffffc02011fc:	16800593          	li	a1,360
 ffffffffc0201200:	00004517          	auipc	a0,0x4
 ffffffffc0201204:	24050513          	addi	a0,a0,576 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201208:	fbbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2378,7 +2407,7 @@ ffffffffc020120c:	00004697          	auipc	a3,0x4
 ffffffffc0201210:	4bc68693          	addi	a3,a3,1212 # ffffffffc02056c8 <class_sizes+0x2d0>
 ffffffffc0201214:	00004617          	auipc	a2,0x4
 ffffffffc0201218:	1bc60613          	addi	a2,a2,444 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020121c:	11b00593          	li	a1,283
+ffffffffc020121c:	16000593          	li	a1,352
 ffffffffc0201220:	00004517          	auipc	a0,0x4
 ffffffffc0201224:	22050513          	addi	a0,a0,544 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201228:	f9bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2387,7 +2416,7 @@ ffffffffc020122c:	00004697          	auipc	a3,0x4
 ffffffffc0201230:	48468693          	addi	a3,a3,1156 # ffffffffc02056b0 <class_sizes+0x2b8>
 ffffffffc0201234:	00004617          	auipc	a2,0x4
 ffffffffc0201238:	19c60613          	addi	a2,a2,412 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020123c:	11a00593          	li	a1,282
+ffffffffc020123c:	15f00593          	li	a1,351
 ffffffffc0201240:	00004517          	auipc	a0,0x4
 ffffffffc0201244:	20050513          	addi	a0,a0,512 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201248:	f7bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2396,7 +2425,7 @@ ffffffffc020124c:	00004697          	auipc	a3,0x4
 ffffffffc0201250:	44468693          	addi	a3,a3,1092 # ffffffffc0205690 <class_sizes+0x298>
 ffffffffc0201254:	00004617          	auipc	a2,0x4
 ffffffffc0201258:	17c60613          	addi	a2,a2,380 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020125c:	11900593          	li	a1,281
+ffffffffc020125c:	15e00593          	li	a1,350
 ffffffffc0201260:	00004517          	auipc	a0,0x4
 ffffffffc0201264:	1e050513          	addi	a0,a0,480 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201268:	f5bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2405,7 +2434,7 @@ ffffffffc020126c:	00004697          	auipc	a3,0x4
 ffffffffc0201270:	3f468693          	addi	a3,a3,1012 # ffffffffc0205660 <class_sizes+0x268>
 ffffffffc0201274:	00004617          	auipc	a2,0x4
 ffffffffc0201278:	15c60613          	addi	a2,a2,348 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020127c:	11700593          	li	a1,279
+ffffffffc020127c:	15c00593          	li	a1,348
 ffffffffc0201280:	00004517          	auipc	a0,0x4
 ffffffffc0201284:	1c050513          	addi	a0,a0,448 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201288:	f3bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2414,7 +2443,7 @@ ffffffffc020128c:	00004697          	auipc	a3,0x4
 ffffffffc0201290:	3bc68693          	addi	a3,a3,956 # ffffffffc0205648 <class_sizes+0x250>
 ffffffffc0201294:	00004617          	auipc	a2,0x4
 ffffffffc0201298:	13c60613          	addi	a2,a2,316 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020129c:	11600593          	li	a1,278
+ffffffffc020129c:	15b00593          	li	a1,347
 ffffffffc02012a0:	00004517          	auipc	a0,0x4
 ffffffffc02012a4:	1a050513          	addi	a0,a0,416 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02012a8:	f1bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2423,7 +2452,7 @@ ffffffffc02012ac:	00004697          	auipc	a3,0x4
 ffffffffc02012b0:	30468693          	addi	a3,a3,772 # ffffffffc02055b0 <class_sizes+0x1b8>
 ffffffffc02012b4:	00004617          	auipc	a2,0x4
 ffffffffc02012b8:	11c60613          	addi	a2,a2,284 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02012bc:	10a00593          	li	a1,266
+ffffffffc02012bc:	14f00593          	li	a1,335
 ffffffffc02012c0:	00004517          	auipc	a0,0x4
 ffffffffc02012c4:	18050513          	addi	a0,a0,384 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02012c8:	efbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2432,7 +2461,7 @@ ffffffffc02012cc:	00004697          	auipc	a3,0x4
 ffffffffc02012d0:	36468693          	addi	a3,a3,868 # ffffffffc0205630 <class_sizes+0x238>
 ffffffffc02012d4:	00004617          	auipc	a2,0x4
 ffffffffc02012d8:	0fc60613          	addi	a2,a2,252 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02012dc:	10100593          	li	a1,257
+ffffffffc02012dc:	14600593          	li	a1,326
 ffffffffc02012e0:	00004517          	auipc	a0,0x4
 ffffffffc02012e4:	16050513          	addi	a0,a0,352 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02012e8:	edbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2441,7 +2470,7 @@ ffffffffc02012ec:	00004697          	auipc	a3,0x4
 ffffffffc02012f0:	33468693          	addi	a3,a3,820 # ffffffffc0205620 <class_sizes+0x228>
 ffffffffc02012f4:	00004617          	auipc	a2,0x4
 ffffffffc02012f8:	0dc60613          	addi	a2,a2,220 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02012fc:	10000593          	li	a1,256
+ffffffffc02012fc:	14500593          	li	a1,325
 ffffffffc0201300:	00004517          	auipc	a0,0x4
 ffffffffc0201304:	14050513          	addi	a0,a0,320 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201308:	ebbfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2450,7 +2479,7 @@ ffffffffc020130c:	00004697          	auipc	a3,0x4
 ffffffffc0201310:	30468693          	addi	a3,a3,772 # ffffffffc0205610 <class_sizes+0x218>
 ffffffffc0201314:	00004617          	auipc	a2,0x4
 ffffffffc0201318:	0bc60613          	addi	a2,a2,188 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020131c:	0e200593          	li	a1,226
+ffffffffc020131c:	12700593          	li	a1,295
 ffffffffc0201320:	00004517          	auipc	a0,0x4
 ffffffffc0201324:	12050513          	addi	a0,a0,288 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201328:	e9bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2459,7 +2488,7 @@ ffffffffc020132c:	00004697          	auipc	a3,0x4
 ffffffffc0201330:	28468693          	addi	a3,a3,644 # ffffffffc02055b0 <class_sizes+0x1b8>
 ffffffffc0201334:	00004617          	auipc	a2,0x4
 ffffffffc0201338:	09c60613          	addi	a2,a2,156 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020133c:	0e000593          	li	a1,224
+ffffffffc020133c:	12500593          	li	a1,293
 ffffffffc0201340:	00004517          	auipc	a0,0x4
 ffffffffc0201344:	10050513          	addi	a0,a0,256 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201348:	e7bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2468,7 +2497,7 @@ ffffffffc020134c:	00004697          	auipc	a3,0x4
 ffffffffc0201350:	2a468693          	addi	a3,a3,676 # ffffffffc02055f0 <class_sizes+0x1f8>
 ffffffffc0201354:	00004617          	auipc	a2,0x4
 ffffffffc0201358:	07c60613          	addi	a2,a2,124 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc020135c:	0df00593          	li	a1,223
+ffffffffc020135c:	12400593          	li	a1,292
 ffffffffc0201360:	00004517          	auipc	a0,0x4
 ffffffffc0201364:	0e050513          	addi	a0,a0,224 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc0201368:	e5bfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2486,34 +2515,34 @@ ffffffffc020137a:	068e                	slli	a3,a3,0x3
 ffffffffc020137c:	96aa                	add	a3,a3,a0
 ffffffffc020137e:	87aa                	mv	a5,a0
 ffffffffc0201380:	00d50e63          	beq	a0,a3,ffffffffc020139c <best_fit_free_pages+0x30>
-        assert(!PageReserved(p) && !PageProperty(p));
+        assert(!PageReserved(p) && !PageProperty(p)); // 确保页面可以被释放 - Ensure pages can be freed
 ffffffffc0201384:	6798                	ld	a4,8(a5)
 ffffffffc0201386:	8b0d                	andi	a4,a4,3
 ffffffffc0201388:	12071063          	bnez	a4,ffffffffc02014a8 <best_fit_free_pages+0x13c>
-        p->flags = 0;
+        p->flags = 0;                                 // 清空标志位 - Clear flag bits
 ffffffffc020138c:	0007b423          	sd	zero,8(a5)
 static inline void set_page_ref(struct Page *page, int val) { page->ref = val; }
 ffffffffc0201390:	0007a023          	sw	zero,0(a5)
     for (; p != base + n; p ++) {
 ffffffffc0201394:	02878793          	addi	a5,a5,40
 ffffffffc0201398:	fed796e3          	bne	a5,a3,ffffffffc0201384 <best_fit_free_pages+0x18>
-    SetPageProperty(base);
+    SetPageProperty(base);                           // 设置属性标志 - Set property flag
 ffffffffc020139c:	00853883          	ld	a7,8(a0)
-    nr_free += n;
+    nr_free += n;                                    // 增加空闲页计数 - Increment free page count
 ffffffffc02013a0:	00009697          	auipc	a3,0x9
 ffffffffc02013a4:	d4068693          	addi	a3,a3,-704 # ffffffffc020a0e0 <free_area>
 ffffffffc02013a8:	4a98                	lw	a4,16(a3)
-    base->property = n;
+    base->property = n;                              // 记录块大小 - Record block size
 ffffffffc02013aa:	2581                	sext.w	a1,a1
-    SetPageProperty(base);
+    SetPageProperty(base);                           // 设置属性标志 - Set property flag
 ffffffffc02013ac:	0028e613          	ori	a2,a7,2
     return list->next == list;
 ffffffffc02013b0:	669c                	ld	a5,8(a3)
-    base->property = n;
+    base->property = n;                              // 记录块大小 - Record block size
 ffffffffc02013b2:	c90c                	sw	a1,16(a0)
-    SetPageProperty(base);
+    SetPageProperty(base);                           // 设置属性标志 - Set property flag
 ffffffffc02013b4:	e510                	sd	a2,8(a0)
-    nr_free += n;
+    nr_free += n;                                    // 增加空闲页计数 - Increment free page count
 ffffffffc02013b6:	9f2d                	addw	a4,a4,a1
 ffffffffc02013b8:	ca98                	sw	a4,16(a3)
         list_add(&free_list, &(base->page_link));
@@ -2594,17 +2623,17 @@ ffffffffc020144a:	4805                	li	a6,1
     for (; p != base + n; p ++) {
 ffffffffc020144c:	87ba                	mv	a5,a4
 ffffffffc020144e:	b769                	j	ffffffffc02013d8 <best_fit_free_pages+0x6c>
-            p->property += base->property;
+            p->property += base->property;      // 合并块大小 - Merge block sizes
 ffffffffc0201450:	01c585bb          	addw	a1,a1,t3
 ffffffffc0201454:	feb82c23          	sw	a1,-8(a6)
-            ClearPageProperty(base);
+            ClearPageProperty(base);            // 清除当前块的头标志 - Clear head flag of current block
 ffffffffc0201458:	ffd8f893          	andi	a7,a7,-3
 ffffffffc020145c:	01153423          	sd	a7,8(a0)
     prev->next = next;
 ffffffffc0201460:	00f83423          	sd	a5,8(a6)
     next->prev = prev;
 ffffffffc0201464:	0107b023          	sd	a6,0(a5)
-            base = p;
+            base = p;                           // 更新base指针 - Update base pointer
 ffffffffc0201468:	851a                	mv	a0,t1
 ffffffffc020146a:	b77d                	j	ffffffffc0201418 <best_fit_free_pages+0xac>
         while ((le = list_next(le)) != &free_list) {
@@ -2623,17 +2652,17 @@ ffffffffc020147a:	f11c                	sd	a5,32(a0)
 ffffffffc020147c:	ed1c                	sd	a5,24(a0)
 ffffffffc020147e:	0141                	addi	sp,sp,16
 ffffffffc0201480:	8082                	ret
-            base->property += p->property;
+            base->property += p->property;      // 合并块大小 - Merge block sizes
 ffffffffc0201482:	ff87a683          	lw	a3,-8(a5)
-            ClearPageProperty(p);
+            ClearPageProperty(p);               // 清除后面块的头标志 - Clear head flag of next block
 ffffffffc0201486:	ff07b703          	ld	a4,-16(a5)
     __list_del(listelm->prev, listelm->next);
 ffffffffc020148a:	0007b803          	ld	a6,0(a5)
 ffffffffc020148e:	6790                	ld	a2,8(a5)
-            base->property += p->property;
+            base->property += p->property;      // 合并块大小 - Merge block sizes
 ffffffffc0201490:	9db5                	addw	a1,a1,a3
 ffffffffc0201492:	c90c                	sw	a1,16(a0)
-            ClearPageProperty(p);
+            ClearPageProperty(p);               // 清除后面块的头标志 - Clear head flag of next block
 ffffffffc0201494:	9b75                	andi	a4,a4,-3
 ffffffffc0201496:	fee7b823          	sd	a4,-16(a5)
 }
@@ -2644,12 +2673,12 @@ ffffffffc020149c:	00c83423          	sd	a2,8(a6)
 ffffffffc02014a0:	01063023          	sd	a6,0(a2)
 ffffffffc02014a4:	0141                	addi	sp,sp,16
 ffffffffc02014a6:	8082                	ret
-        assert(!PageReserved(p) && !PageProperty(p));
+        assert(!PageReserved(p) && !PageProperty(p)); // 确保页面可以被释放 - Ensure pages can be freed
 ffffffffc02014a8:	00004697          	auipc	a3,0x4
 ffffffffc02014ac:	27068693          	addi	a3,a3,624 # ffffffffc0205718 <class_sizes+0x320>
 ffffffffc02014b0:	00004617          	auipc	a2,0x4
 ffffffffc02014b4:	f2060613          	addi	a2,a2,-224 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02014b8:	08700593          	li	a1,135
+ffffffffc02014b8:	0bd00593          	li	a1,189
 ffffffffc02014bc:	00004517          	auipc	a0,0x4
 ffffffffc02014c0:	f8450513          	addi	a0,a0,-124 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02014c4:	cfffe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2658,7 +2687,7 @@ ffffffffc02014c8:	00004697          	auipc	a3,0x4
 ffffffffc02014cc:	f7068693          	addi	a3,a3,-144 # ffffffffc0205438 <class_sizes+0x40>
 ffffffffc02014d0:	00004617          	auipc	a2,0x4
 ffffffffc02014d4:	f0060613          	addi	a2,a2,-256 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02014d8:	08400593          	li	a1,132
+ffffffffc02014d8:	0b800593          	li	a1,184
 ffffffffc02014dc:	00004517          	auipc	a0,0x4
 ffffffffc02014e0:	f6450513          	addi	a0,a0,-156 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02014e4:	cdffe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2676,35 +2705,35 @@ ffffffffc02014f4:	068e                	slli	a3,a3,0x3
 ffffffffc02014f6:	96aa                	add	a3,a3,a0
 ffffffffc02014f8:	87aa                	mv	a5,a0
 ffffffffc02014fa:	00d50f63          	beq	a0,a3,ffffffffc0201518 <best_fit_init_memmap+0x30>
-        assert(PageReserved(p));
+        assert(PageReserved(p));        // 确保页面之前是保留状态 - Ensure page was reserved
 ffffffffc02014fe:	6798                	ld	a4,8(a5)
 ffffffffc0201500:	8b05                	andi	a4,a4,1
 ffffffffc0201502:	cf41                	beqz	a4,ffffffffc020159a <best_fit_init_memmap+0xb2>
-        p->flags = 0;
+        p->flags = 0;                   // 清空标志位 - Clear flags
 ffffffffc0201504:	0007b423          	sd	zero,8(a5)
-        p->property = 0;
+        p->property = 0;                // 清空属性 - Clear property
 ffffffffc0201508:	0007a823          	sw	zero,16(a5)
 ffffffffc020150c:	0007a023          	sw	zero,0(a5)
     for (; p != base + n; p ++) {
 ffffffffc0201510:	02878793          	addi	a5,a5,40
 ffffffffc0201514:	fed795e3          	bne	a5,a3,ffffffffc02014fe <best_fit_init_memmap+0x16>
-    SetPageProperty(base);
+    SetPageProperty(base);              // 设置页面属性标志 - Set page property flag
 ffffffffc0201518:	6510                	ld	a2,8(a0)
-    nr_free += n;
+    nr_free += n;                       // 增加空闲页计数 - Increment free page count
 ffffffffc020151a:	00009697          	auipc	a3,0x9
 ffffffffc020151e:	bc668693          	addi	a3,a3,-1082 # ffffffffc020a0e0 <free_area>
 ffffffffc0201522:	4a98                	lw	a4,16(a3)
-    base->property = n;
+    base->property = n;                 // 头页面记录整个块的大小 - Head page records the size of entire block
 ffffffffc0201524:	2581                	sext.w	a1,a1
-    SetPageProperty(base);
+    SetPageProperty(base);              // 设置页面属性标志 - Set page property flag
 ffffffffc0201526:	00266613          	ori	a2,a2,2
     return list->next == list;
 ffffffffc020152a:	669c                	ld	a5,8(a3)
-    base->property = n;
+    base->property = n;                 // 头页面记录整个块的大小 - Head page records the size of entire block
 ffffffffc020152c:	c90c                	sw	a1,16(a0)
-    SetPageProperty(base);
+    SetPageProperty(base);              // 设置页面属性标志 - Set page property flag
 ffffffffc020152e:	e510                	sd	a2,8(a0)
-    nr_free += n;
+    nr_free += n;                       // 增加空闲页计数 - Increment free page count
 ffffffffc0201530:	9db9                	addw	a1,a1,a4
 ffffffffc0201532:	ca8c                	sw	a1,16(a3)
         list_add(&free_list, &(base->page_link));
@@ -2773,12 +2802,12 @@ ffffffffc0201592:	f11c                	sd	a5,32(a0)
 ffffffffc0201594:	ed1c                	sd	a5,24(a0)
 ffffffffc0201596:	0141                	addi	sp,sp,16
 ffffffffc0201598:	8082                	ret
-        assert(PageReserved(p));
+        assert(PageReserved(p));        // 确保页面之前是保留状态 - Ensure page was reserved
 ffffffffc020159a:	00004697          	auipc	a3,0x4
 ffffffffc020159e:	1a668693          	addi	a3,a3,422 # ffffffffc0205740 <class_sizes+0x348>
 ffffffffc02015a2:	00004617          	auipc	a2,0x4
 ffffffffc02015a6:	e2e60613          	addi	a2,a2,-466 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02015aa:	04a00593          	li	a1,74
+ffffffffc02015aa:	05400593          	li	a1,84
 ffffffffc02015ae:	00004517          	auipc	a0,0x4
 ffffffffc02015b2:	e9250513          	addi	a0,a0,-366 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02015b6:	c0dfe0ef          	jal	ra,ffffffffc02001c2 <__panic>
@@ -2787,7 +2816,7 @@ ffffffffc02015ba:	00004697          	auipc	a3,0x4
 ffffffffc02015be:	e7e68693          	addi	a3,a3,-386 # ffffffffc0205438 <class_sizes+0x40>
 ffffffffc02015c2:	00004617          	auipc	a2,0x4
 ffffffffc02015c6:	e0e60613          	addi	a2,a2,-498 # ffffffffc02053d0 <boot_page_table_sv39+0x13d0>
-ffffffffc02015ca:	04700593          	li	a1,71
+ffffffffc02015ca:	04f00593          	li	a1,79
 ffffffffc02015ce:	00004517          	auipc	a0,0x4
 ffffffffc02015d2:	e7250513          	addi	a0,a0,-398 # ffffffffc0205440 <class_sizes+0x48>
 ffffffffc02015d6:	bedfe0ef          	jal	ra,ffffffffc02001c2 <__panic>

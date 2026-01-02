@@ -7,6 +7,22 @@
 
 #define MAX_TIME_SLICE 5
 
+#define SCHED_POLICY_RR 0
+#define SCHED_POLICY_FIFO 1
+#define SCHED_POLICY_SJF 2
+#define SCHED_POLICY_SRTF 3
+#define SCHED_POLICY_HRRN 4
+#define SCHED_POLICY_MLFQ 5
+#define SCHED_POLICY_STRIDE 6
+#define SCHED_POLICY_CFS 7
+
+#ifndef SCHED_POLICY
+#define SCHED_POLICY SCHED_POLICY_RR
+#endif
+
+#define MLFQ_LEVELS 4
+#define MLFQ_BOOST_INTERVAL 200
+
 struct proc_struct;
 
 struct run_queue;
@@ -44,6 +60,12 @@ struct run_queue
     int max_time_slice;
     // For LAB6 ONLY
     skew_heap_entry_t *lab6_run_pool;
+    list_entry_t mlfq[MLFQ_LEVELS];
+    int mlfq_levels;
+    uint32_t mlfq_boost_interval;
+    uint32_t mlfq_last_boost;
+    uint64_t cfs_min_vruntime;
+    uint32_t cfs_total_weight;
 };
 
 void sched_init(void);

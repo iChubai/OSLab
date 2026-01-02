@@ -38,6 +38,7 @@ void sched_class_proc_tick(struct proc_struct *proc)
 {
     if (proc != idleproc)
     {
+        proc->sched_runtime_ticks++;
         sched_class->proc_tick(rq, proc);
     }
     else
@@ -52,7 +53,35 @@ void sched_init(void)
 {
     list_init(&timer_list);
 
-    sched_class = &default_sched_class;
+    // Keep RR as default to match grade expectations; switch via SCHED_POLICY.
+    switch (SCHED_POLICY)
+    {
+    case SCHED_POLICY_FIFO:
+        sched_class = &fifo_sched_class;
+        break;
+    case SCHED_POLICY_SJF:
+        sched_class = &sjf_sched_class;
+        break;
+    case SCHED_POLICY_SRTF:
+        sched_class = &srtf_sched_class;
+        break;
+    case SCHED_POLICY_HRRN:
+        sched_class = &hrrn_sched_class;
+        break;
+    case SCHED_POLICY_MLFQ:
+        sched_class = &mlfq_sched_class;
+        break;
+    case SCHED_POLICY_STRIDE:
+        sched_class = &stride_sched_class;
+        break;
+    case SCHED_POLICY_CFS:
+        sched_class = &cfs_sched_class;
+        break;
+    case SCHED_POLICY_RR:
+    default:
+        sched_class = &default_sched_class;
+        break;
+    }
 
     rq = &__rq;
     rq->max_time_slice = MAX_TIME_SLICE;

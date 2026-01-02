@@ -13,6 +13,9 @@
 #include <assert.h>
 #include <unistd.h>
 
+// Scheduler defaults for custom policies.
+#define SCHED_DEFAULT_EXPECTED 50
+
 /* ------------- process/thread mechanism design&implementation -------------
 (an simplified Linux process/thread mechanism )
 introduction:
@@ -109,6 +112,14 @@ alloc_proc(void)
         skew_heap_init(&(proc->lab6_run_pool));
         proc->lab6_stride = 0;
         proc->lab6_priority = 1;
+        proc->sched_expected = SCHED_DEFAULT_EXPECTED;
+        proc->sched_remaining = SCHED_DEFAULT_EXPECTED;
+        proc->sched_wait_start = 0;
+        proc->sched_last_start = 0;
+        proc->sched_runtime_ticks = 0;
+        proc->sched_vruntime = 0;
+        proc->sched_qlevel = 0;
+        proc->sched_nice = 0;
     }
     return proc;
 }
@@ -986,4 +997,31 @@ void lab6_set_priority(uint32_t priority)
         current->lab6_priority = 1;
     else
         current->lab6_priority = priority;
+}
+
+void sched_set_burst(uint32_t expected, uint32_t remaining)
+{
+    if (expected == 0)
+    {
+        expected = 1;
+    }
+    current->sched_expected = expected;
+    if (remaining == 0)
+    {
+        remaining = expected;
+    }
+    current->sched_remaining = remaining;
+}
+
+void sched_set_nice(int nice)
+{
+    if (nice < -20)
+    {
+        nice = -20;
+    }
+    if (nice > 19)
+    {
+        nice = 19;
+    }
+    current->sched_nice = nice;
 }

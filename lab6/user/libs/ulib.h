@@ -33,6 +33,8 @@ int getpid(void);
 void print_pgdir(void);
 unsigned int gettime_msec(void);
 void lab6_setpriority(uint32_t priority);
+void sched_set_burst(uint32_t expected, uint32_t remaining);
+void sched_set_nice(int nice);
+int sched_get_runtime(void);
 
 #endif /* !__USER_LIBS_ULIB_H__ */
-

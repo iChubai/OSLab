@@ -201,7 +201,7 @@ default_free_pages(struct Page *base, size_t n) {
     base->property = n;                              // 记录块大小 - Record block size
     SetPageProperty(base);                           // 设置属性标志 - Set property flag
     
-     += n;                                    // 增加空闲页计数 - Increment free page count
+    nr_free += n;                                    // 增加空闲页计数 - Increment free page count
 
     // 将释放的块按地址顺序插入空闲链表 - Insert freed block into free list in address order
     if (list_empty(&free_list)) {
