@@ -17,6 +17,8 @@
 #include <sbi.h>
 #include <proc.h>
 
+void dev_stdin_write(char c);
+
 #define TICK_NUM 2
 
 static void print_ticks()
